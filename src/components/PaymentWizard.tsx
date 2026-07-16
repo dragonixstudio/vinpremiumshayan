@@ -40,7 +40,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     {
       id: "silver",
       name: "Silver Starter",
-      price: 19,
+      price: 24.99,
       description: "Basic verification for low-risk secondary market cars",
       features: [
         "Official DVLA registration details",
@@ -54,7 +54,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     {
       id: "gold",
       name: "Gold Ultimate Check",
-      price: 30,
+      price: 49.99,
       badge: "Most Popular",
       description: "Comprehensive 80+ criteria lookup with complete coverage guarantee",
       features: [
@@ -70,7 +70,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     {
       id: "diamond",
       name: "Diamond Elite Bundle",
-      price: 40,
+      price: 104.99,
       badge: "Best Value",
       description: "Multi-vehicle checks (3 reports) + real-time alerts for 1 year",
       features: [
@@ -359,8 +359,8 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                           <p className="font-sans text-xs text-gray-400 mb-4 h-10">{plan.description}</p>
                           
                           <div className="mb-6 flex items-baseline">
-                            <span className="font-display font-bold text-3xl text-gray-900">${plan.price}</span>
-                            <span className="font-sans text-xs text-gray-500 ml-1">USD</span>
+                            <span className="font-display font-bold text-3xl text-gray-900">£{plan.price}</span>
+                            <span className="font-sans text-xs text-gray-500 ml-1">GBP</span>
                           </div>
 
                           <div className="border-t border-gray-100/80 pt-4 space-y-2">
@@ -515,7 +515,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                         ) : (
                           <>
                             <Lock className="w-4 h-4" />
-                            <span>Pay & Decrypt Full Report (${selectedPlan.price} USD)</span>
+                            <span>Pay & Decrypt Full Report (£{selectedPlan.price} GBP)</span>
                           </>
                         )}
                       </button>
@@ -540,7 +540,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                     <div className="space-y-3 py-4 border-y border-gray-200/60 text-xs">
                       <div className="flex justify-between font-sans">
                         <span className="text-gray-500">Premium Lookup Database Rate</span>
-                        <span className="text-gray-900 font-semibold">${selectedPlan.price}.00</span>
+                        <span className="text-gray-900 font-semibold">£{selectedPlan.price}</span>
                       </div>
                       <div className="flex justify-between font-sans">
                         <span className="text-gray-500">Government Registry Fee</span>
@@ -554,7 +554,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
 
                     <div className="flex justify-between items-baseline pt-4 mb-6">
                       <span className="font-display font-bold text-sm text-gray-800">Total Charged Amount</span>
-                      <span className="font-display font-bold text-2xl text-red-600">${selectedPlan.price}.00 USD</span>
+                      <span className="font-display font-bold text-2xl text-red-600">£{selectedPlan.price} GBP</span>
                     </div>
                   </div>
 

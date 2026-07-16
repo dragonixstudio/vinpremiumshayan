@@ -31,3 +31,97 @@
 .animate-pulse-slow {
   animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* HIGH-FIDELITY PDF & PRINT STYLES */
+@media print {
+  /* Hide standard non-print UI elements */
+  nav, footer, header, #hero-banner, #faq-section, #trust-strip, #pricing-section,
+  .print-hidden, .no-print, button, svg.lucide-printer, .bg-red-950,
+  #app-root > div:first-child, .mb-6, .flex.justify-between.items-center {
+    display: none !important;
+  }
+
+  /* Reset body and container defaults */
+  html, body {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Ensure the main app content doesn't break overflow */
+  #root, #app-root, main {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    float: none !important;
+    position: relative !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Remove max-width and margins from container wrapper */
+  #printable-report-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Style report viewer container to fit perfectly on A4 pages */
+  #report-view-container {
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Force expanded state of items like MOT details so they display printed */
+  .hidden.print\:block, .print-block {
+    display: block !important;
+  }
+
+  /* Force elements that have background colors to keep them in print */
+  .bg-gray-50, .bg-yellow-100\/50, .bg-green-50, .bg-red-50, .bg-red-50\/10 {
+    background-color: rgba(249, 250, 251, 1) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent row and panel cutoffs mid-page */
+  .print\:break-inside-avoid, .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Format tables clean */
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  /* Ensure charts print properly */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 250px !important;
+  }
+}

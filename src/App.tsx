@@ -26,15 +26,17 @@ import {
 import Navbar from "./components/Navbar";
 import AboutView from "./components/AboutView";
 import PrivacyView from "./components/PrivacyView";
+import AffiliateView from "./components/AffiliateView";
 import PaymentWizard from "./components/PaymentWizard";
 import ReportViewer from "./components/ReportViewer";
 import { VehicleReport } from "./types";
+import { generateSimulatedReport } from "./lib/mockDatabase";
 
 // Path to the generated premium background image
-const carBanner = "/src/assets/images/car_banner_1784095133179.jpg";
+const carBanner = "/car_banner_1784095133179.jpg";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate">("home");
   const [vinOrPlate, setVinOrPlate] = useState("");
   const [searchType, setSearchType] = useState<"vin" | "plate">("plate");
   
@@ -111,17 +113,24 @@ export default function App() {
     }, 900);
 
     try {
-      const response = await fetch("/api/report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vinOrPlate: query, type }),
-      });
+      let data: VehicleReport;
+      try {
+        const response = await fetch("/api/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vinOrPlate: query, type }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Unable to connect to UK databases. Please check input.");
+        if (response.ok) {
+          data = await response.json();
+        } else {
+          // Fallback to client-side simulation if server reports an error
+          data = generateSimulatedReport(query, type);
+        }
+      } catch (fetchErr) {
+        // Fallback if offline/network error/hosted statically on Vercel
+        data = generateSimulatedReport(query, type);
       }
-
-      const data: VehicleReport = await response.json();
       
       // Complete remaining loading ticks
       setTimeout(() => {
@@ -173,9 +182,12 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between" id="app-root">
       
       {/* Top Banner Ticker */}
-      <div className="bg-red-950 text-white py-2 px-4 text-center text-xs font-sans tracking-wide border-b border-red-800 flex items-center justify-center space-x-2">
-        <span className="bg-red-600 text-white font-bold text-[9px] px-2 py-0.5 rounded-sm">ALERT</span>
-        <span>Secure real-time UK vehicle registers interface active. Over 45,000 checks processed today.</span>
+      <div className="bg-red-950 text-white py-2 px-4 text-center text-[10px] sm:text-xs font-sans tracking-wide border-b border-red-800 flex flex-col sm:flex-row items-center justify-center gap-1 sm:space-x-2">
+        <div className="flex items-center space-x-1 shrink-0">
+          <span className="bg-red-600 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-sm">ALERT</span>
+          <span className="font-semibold text-red-300 sm:hidden">UK SYSTEM ACTIVE</span>
+        </div>
+        <span className="truncate max-w-full text-gray-200">Secure real-time UK vehicle registers interface active. 45,000+ checks processed today.</span>
       </div>
 
       {/* Navigation Header */}
@@ -194,10 +206,13 @@ export default function App() {
         {/* VIEW: PRIVACY */}
         {activeTab === "privacy" && <PrivacyView />}
 
+        {/* VIEW: AFFILIATE PROGRAM */}
+        {activeTab === "affiliate" && <AffiliateView />}
+
         {/* VIEW: ACTIVE REPORT */}
         {activeTab === "report" && report && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <div className="mb-6 flex justify-between items-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10" id="printable-report-wrapper">
+            <div className="mb-6 flex justify-between items-center print:hidden">
               <button
                 onClick={() => setActiveTab("home")}
                 className="text-sm font-sans font-semibold text-gray-500 hover:text-red-600 cursor-pointer flex items-center space-x-1.5"
@@ -219,32 +234,33 @@ export default function App() {
             
             {/* HERO SECTION WITH BIG IMAGE BANNER */}
             <div 
-              className="relative bg-gray-900 overflow-hidden min-h-[500px] md:min-h-[600px] flex items-center"
+              className="relative bg-gray-900 overflow-hidden min-h-[550px] md:min-h-[600px] flex items-center py-10 md:py-20"
               id="hero-banner"
             >
               {/* Sleek dark layout layer overlay on top of red sports car image */}
-              <div className="absolute inset-0 z-0 opacity-40 mix-blend-multiply bg-gradient-to-r from-red-950 to-gray-950" />
               <div 
-                className="absolute inset-0 bg-cover bg-center z-0 scale-105 animate-pulse-slow" 
+                className="absolute inset-0 bg-cover bg-center z-0 scale-105 animate-pulse-slow opacity-45 lg:opacity-60" 
                 style={{ backgroundImage: `url(${carBanner})` }}
               />
+              <div className="absolute inset-0 z-0 bg-gradient-to-b from-gray-950/95 via-gray-950/85 to-gray-950/95 lg:bg-gradient-to-r lg:from-red-950/80 lg:to-gray-950/95" />
               
-              <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 text-white w-full">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+              <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 text-white w-full">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
                   
                   {/* Left Column: Headline and Trust */}
-                  <div className="lg:col-span-7 space-y-6">
-                    <span className="inline-flex items-center space-x-2 bg-red-600/90 text-white font-mono text-[10px] font-bold tracking-widest uppercase py-1.5 px-4 rounded-full border border-red-500/30">
+                  <div className="lg:col-span-7 space-y-6 bg-black/30 backdrop-blur-xs lg:bg-transparent p-6 sm:p-8 lg:p-0 rounded-2xl border border-white/5 lg:border-none">
+                    <span className="inline-flex items-center space-x-2 bg-red-600/90 text-white font-mono text-[9px] sm:text-[10px] font-bold tracking-widest uppercase py-1.5 px-4 rounded-full border border-red-500/30">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>OFFICIAL UK VEHICLE HISTORY AUDITS</span>
                     </span>
-                    <h1 className="font-display font-bold text-4xl md:text-5xl lg:text-6xl tracking-tight leading-none text-white">
+                    <h1 className="font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl tracking-tight leading-none text-white">
                       Don't Buy A Used Car <br />
                       <span className="text-red-500">Without Checking It First</span>
                     </h1>
-                    <p className="font-sans text-sm md:text-base text-gray-200 max-w-lg leading-relaxed">
+                    <p className="font-sans text-xs sm:text-sm md:text-base text-gray-200 max-w-lg leading-relaxed">
                       Enter any UK registration plate or chassis VIN to decrypt live mileage records, outstanding finance, salvage categories, and stolen histories instantly.
                     </p>
+
 
                     {/* Trust badges */}
                     <div className="pt-4 flex flex-wrap gap-4 items-center">
@@ -369,28 +385,62 @@ export default function App() {
                             <span>Verify Vehicle Past History</span>
                           </button>
 
-                          {/* Quick Demos */}
-                          <div className="pt-4 border-t border-gray-100">
-                            <span className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-2">
-                              Test Live Simulated Queries:
-                            </span>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleDemoClick("WP69 XYA")}
-                                className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-gray-600 cursor-pointer transition-colors"
-                              >
-                                WP69 XYA (Audi)
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDemoClick("LS21 TES")}
-                                className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-gray-600 cursor-pointer transition-colors"
-                              >
-                                LS21 TES (Tesla)
-                              </button>
-                            </div>
-                          </div>
+                           {/* Quick Demos */}
+                           <div className="pt-4 border-t border-gray-100">
+                             <span className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-2">
+                               Test Live Simulated Queries (6 Vehicle Scenarios):
+                             </span>
+                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("WP69 XYA")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="WP69 XYA (BMW 3 Series - Clean)"
+                               >
+                                 🟢 WP69 XYA (BMW)
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("LS21 TES")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="LS21 TES (Tesla Model 3 - Clean)"
+                               >
+                                 🟢 LS21 TES (Tesla)
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("LV70 ABC")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="LV70 ABC (Audi A4 - Outstanding Finance)"
+                               >
+                                 🟡 LV70 ABC (Audi Finance)
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("GJ18 XYZ")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="GJ18 XYZ (Ford Fiesta - Cat N Write-off)"
+                               >
+                                 🟠 GJ18 XYZ (Fiesta Cat N)
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("HG21 HBY")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="HG21 HBY (Toyota Yaris - Pristine Hybrid)"
+                               >
+                                 🟢 HG21 HBY (Yaris Hybrid)
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleDemoClick("RO67 VLR")}
+                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
+                                 title="RO67 VLR (Range Rover - Structural S & Finance)"
+                               >
+                                 🔴 RO67 VLR (Velar Cat S)
+                               </button>
+                             </div>
+                           </div>
 
                         </form>
                       )}
@@ -496,8 +546,8 @@ export default function App() {
                       </div>
 
                       <div className="mb-6 flex items-baseline">
-                        <span className="font-display font-bold text-4xl text-gray-900">$19</span>
-                        <span className="font-sans text-xs text-gray-400 ml-1">USD</span>
+                        <span className="font-display font-bold text-4xl text-gray-900">£24.99</span>
+                        <span className="font-sans text-xs text-gray-400 ml-1">GBP</span>
                       </div>
 
                       <p className="font-sans text-xs text-gray-500 mb-6 leading-relaxed">
@@ -546,8 +596,8 @@ export default function App() {
                       </div>
 
                       <div className="mb-6 flex items-baseline">
-                        <span className="font-display font-bold text-4xl text-gray-900">$30</span>
-                        <span className="font-sans text-xs text-gray-400 ml-1">USD</span>
+                        <span className="font-display font-bold text-4xl text-gray-900">£49.99</span>
+                        <span className="font-sans text-xs text-gray-400 ml-1">GBP</span>
                       </div>
 
                       <p className="font-sans text-xs text-gray-500 mb-6 leading-relaxed">
@@ -594,8 +644,8 @@ export default function App() {
                       </div>
 
                       <div className="mb-6 flex items-baseline">
-                        <span className="font-display font-bold text-4xl text-gray-900">$40</span>
-                        <span className="font-sans text-xs text-gray-400 ml-1">USD</span>
+                        <span className="font-display font-bold text-4xl text-gray-900">£104.99</span>
+                        <span className="font-sans text-xs text-gray-400 ml-1">GBP</span>
                       </div>
 
                       <p className="font-sans text-xs text-gray-500 mb-6 leading-relaxed">
@@ -802,6 +852,11 @@ export default function App() {
                 <li>
                   <button onClick={() => setActiveTab("about")} className="hover:text-red-500 cursor-pointer text-left">
                     About Our Datasets
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setActiveTab("affiliate")} className="text-red-400 font-semibold hover:text-red-500 cursor-pointer text-left flex items-center space-x-1">
+                    <span>Affiliate Partner (35% Commission)</span>
                   </button>
                 </li>
                 <li>

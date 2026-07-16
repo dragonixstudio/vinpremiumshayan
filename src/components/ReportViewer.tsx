@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+// @ts-ignore
+import html2pdf from "html2pdf.js";
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -38,10 +40,37 @@ interface ReportViewerProps {
 
 export default function ReportViewer({ report, isUnlocked, onUnlockClick }: ReportViewerProps) {
   const [expandedMot, setExpandedMot] = useState<number | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Print utility that simulates downloadable PDF
+  // Print utility that generates clean downloadable PDF
   const handlePrint = () => {
-    window.print();
+    setIsGeneratingPdf(true);
+    const element = document.getElementById("printable-report-content");
+    if (!element) {
+      setIsGeneratingPdf(false);
+      return;
+    }
+
+    const opt = {
+      margin:       10,
+      filename:     `VinPremium-Report-${report.plate}.pdf`,
+      image:        { type: "jpeg" as const, quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: "mm", format: "a4", orientation: "portrait" as const }
+    };
+
+    // @ts-ignore
+    html2pdf()
+      .from(element)
+      .set(opt)
+      .save()
+      .then(() => {
+        setIsGeneratingPdf(false);
+      })
+      .catch((err: any) => {
+        console.error("PDF generation error:", err);
+        setIsGeneratingPdf(false);
+      });
   };
 
   const scoreColor = report.score >= 90 
@@ -89,17 +118,27 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
           <div className="flex items-center space-x-3">
             <button
               onClick={handlePrint}
-              className="bg-white text-gray-700 border border-gray-200 hover:border-red-600 hover:text-red-600 text-xs font-sans font-bold py-1.5 px-4 rounded-lg flex items-center space-x-1.5 cursor-pointer transition-colors"
+              disabled={isGeneratingPdf}
+              className="bg-white text-gray-700 border border-gray-200 hover:border-red-600 hover:text-red-600 text-xs font-sans font-bold py-1.5 px-4 rounded-lg flex items-center space-x-1.5 cursor-pointer transition-colors disabled:opacity-50"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print/Save PDF</span>
+              {isGeneratingPdf ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Generating PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print/Save PDF</span>
+                </>
+              )}
             </button>
           </div>
         </div>
       )}
 
       {/* Main Printable Certificate Container */}
-      <div className="p-8 md:p-12 print:p-4">
+      <div id="printable-report-content" className="p-8 md:p-12 print:p-4 bg-white rounded-2xl">
         
         {/* Certificate Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-100 pb-8 mb-8 space-y-4 md:space-y-0">
@@ -461,50 +500,48 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
                             <p className="font-mono font-medium text-gray-800">{mot.expiryDate}</p>
                           </div>
                         )}
-                        <span className="text-gray-400 font-bold ml-2">{isExpanded ? "▲" : "▼"}</span>
+                        <span className="text-gray-400 font-bold ml-2 print:hidden">{isExpanded ? "▲" : "▼"}</span>
                       </div>
                     </div>
 
                     {/* Expandable failure/advisory list */}
-                    {isExpanded && (
-                      <div className="p-4 bg-white border-t border-gray-100 divide-y divide-gray-100">
-                        {/* Failures */}
-                        {mot.failures && mot.failures.length > 0 && (
-                          <div className="pb-3 mb-3">
-                            <h5 className="font-display font-bold text-xs text-red-700 flex items-center space-x-1 mb-2">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              <span>Critical Test Failure Reasons:</span>
-                            </h5>
-                            <ul className="list-disc list-inside font-sans text-xs text-gray-700 space-y-1.5 pl-2">
-                              {mot.failures.map((f: string, idx: number) => (
-                                <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
-                                  {!isUnlocked ? "Censored failure reason details on preview" : f}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Advisories */}
-                        <div>
-                          <h5 className="font-display font-semibold text-xs text-yellow-700 flex items-center space-x-1 mb-2 mt-2">
+                    <div className={`p-4 bg-white border-t border-gray-100 divide-y divide-gray-100 ${isExpanded ? "block" : "hidden print:block"}`}>
+                      {/* Failures */}
+                      {mot.failures && mot.failures.length > 0 && (
+                        <div className="pb-3 mb-3">
+                          <h5 className="font-display font-bold text-xs text-red-700 flex items-center space-x-1 mb-2">
                             <AlertTriangle className="w-3.5 h-3.5" />
-                            <span>Advisory Notice Items:</span>
+                            <span>Critical Test Failure Reasons:</span>
                           </h5>
-                          {mot.advisories && mot.advisories.length > 0 ? (
-                            <ul className="list-disc list-inside font-sans text-xs text-gray-600 space-y-1 pl-2">
-                              {mot.advisories.map((adv: string, idx: number) => (
-                                <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
-                                  {!isUnlocked ? "Censored advisory notice item log" : adv}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="font-sans text-xs text-gray-400 pl-2">No active advisories noted.</p>
-                          )}
+                          <ul className="list-disc list-inside font-sans text-xs text-gray-700 space-y-1.5 pl-2">
+                            {mot.failures.map((f: string, idx: number) => (
+                              <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
+                                {!isUnlocked ? "Censored failure reason details on preview" : f}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
+                      )}
+
+                      {/* Advisories */}
+                      <div>
+                        <h5 className="font-display font-semibold text-xs text-yellow-700 flex items-center space-x-1 mb-2 mt-2">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Advisory Notice Items:</span>
+                        </h5>
+                        {mot.advisories && mot.advisories.length > 0 ? (
+                          <ul className="list-disc list-inside font-sans text-xs text-gray-600 space-y-1 pl-2">
+                            {mot.advisories.map((adv: string, idx: number) => (
+                              <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
+                                {!isUnlocked ? "Censored advisory notice item log" : adv}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="font-sans text-xs text-gray-400 pl-2">No active advisories noted.</p>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })
