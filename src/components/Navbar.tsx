@@ -2,8 +2,8 @@ import React from "react";
 import { ShieldCheck, FileText, Menu, X, PhoneCall } from "lucide-react";
 
 interface NavbarProps {
-  activeTab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate";
-  setActiveTab: (tab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate") => void;
+  activeTab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact";
+  setActiveTab: (tab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact") => void;
   hasActiveReport: boolean;
 }
 
@@ -14,6 +14,7 @@ export default function Navbar({ activeTab, setActiveTab, hasActiveReport }: Nav
     { id: "home", label: "Home" },
     { id: "about", label: "About Us" },
     { id: "pricing", label: "Pricing Plans" },
+    { id: "contact", label: "Contact & Support" },
     { id: "affiliate", label: "Affiliate Program" },
     { id: "privacy", label: "Privacy Policy" },
     ...(hasActiveReport ? [{ id: "report", label: "Active Report" }] : []),

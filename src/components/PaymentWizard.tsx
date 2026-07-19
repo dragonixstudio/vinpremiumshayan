@@ -497,25 +497,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                         )}
                       </button>
 
-                      {/* Developer Sandbox Section */}
-                      <div className="border-t border-dashed border-gray-200 pt-4 mt-4">
-                        <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-4">
-                          <p className="text-[10px] font-mono font-bold text-amber-800 uppercase tracking-wider mb-1">
-                            DEVELOPER SANDBOX & REVIEW MODE
-                          </p>
-                          <p className="text-[11px] text-amber-700 leading-relaxed mb-3">
-                            Click below to immediately trigger a mock webhook ping and test the full checkout success flow (bypassing live payments).
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handleSimulatePayment}
-                            disabled={isPaying}
-                            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-sans font-bold text-xs py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
-                          >
-                            <span>Simulate Instant Webhook & Success</span>
-                          </button>
-                        </div>
-                      </div>
+
 
                     </div>
 

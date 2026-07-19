@@ -16,6 +16,8 @@ import {
 
 export default function AffiliateView() {
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -24,9 +26,45 @@ export default function AffiliateView() {
     message: ""
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSubmitted(true);
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    const data = new FormData();
+    data.append("access_key", "ef8188b1-f6d1-4c68-866a-f3bde4eef1a8");
+    data.append("name", formData.name);
+    data.append("email", formData.email);
+    data.append("subject", `NEW AFFILIATE PARTNER APPLICATION: ${formData.name}`);
+    data.append(
+      "message",
+      `Affiliate Partner Application Details:
+Name: ${formData.name}
+Email: ${formData.email}
+Website/Channel: ${formData.website}
+Traffic Source: ${formData.source}
+
+Partner Vision:
+${formData.message}`
+    );
+
+    try {
+      const response = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        body: data,
+      });
+
+      const resJson = await response.json();
+      if (resJson.success) {
+        setFormSubmitted(true);
+      } else {
+        setSubmitError(resJson.message || "Could not submit application. Please check your details.");
+      }
+    } catch (err) {
+      setSubmitError("Failed to reach partnership servers. Please check your network connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -199,11 +237,18 @@ export default function AffiliateView() {
                 />
               </div>
 
+              {submitError && (
+                <div className="bg-red-50 border-l-4 border-red-600 p-3 rounded-r-lg text-xs font-sans text-red-800 font-medium">
+                  {submitError}
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-sans font-bold text-xs py-4 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-lg shadow-red-200"
+                disabled={isSubmitting}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-sans font-bold text-xs py-4 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-lg shadow-red-200 disabled:opacity-85"
               >
-                <span>Submit Partnership Registration</span>
+                <span>{isSubmitting ? "Submitting Application..." : "Submit Partnership Registration"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

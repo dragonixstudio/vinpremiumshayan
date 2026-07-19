@@ -31,6 +31,7 @@ import PaymentWizard from "./components/PaymentWizard";
 import ReportViewer from "./components/ReportViewer";
 import SuccessView from "./components/SuccessView";
 import CancelView from "./components/CancelView";
+import ContactView from "./components/ContactView";
 import { VehicleReport } from "./types";
 import { generateSimulatedReport } from "./lib/mockDatabase";
 
@@ -38,7 +39,7 @@ import { generateSimulatedReport } from "./lib/mockDatabase";
 const carBanner = "/car_banner_1784095133179.jpg";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "success" | "cancel">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "success" | "cancel" | "contact">("home");
   const [vinOrPlate, setVinOrPlate] = useState("");
   const [searchType, setSearchType] = useState<"vin" | "plate">("plate");
   
@@ -249,6 +250,9 @@ export default function App() {
 
         {/* VIEW: PRIVACY */}
         {activeTab === "privacy" && <PrivacyView />}
+
+        {/* VIEW: CONTACT & SUPPORT */}
+        {activeTab === "contact" && <ContactView />}
 
         {/* VIEW: AFFILIATE PROGRAM */}
         {activeTab === "affiliate" && <AffiliateView />}
@@ -911,6 +915,11 @@ export default function App() {
                 <li>
                   <button onClick={() => setActiveTab("about")} className="hover:text-red-500 cursor-pointer text-left">
                     About Our Datasets
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setActiveTab("contact")} className="hover:text-red-500 cursor-pointer text-left">
+                    Contact & Priority Support
                   </button>
                 </li>
                 <li>
