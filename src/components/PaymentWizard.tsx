@@ -28,11 +28,8 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
   const [progress, setProgress] = useState(0);
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null);
   
-  // Credit card form state
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
-  const [cardName, setCardName] = useState("");
+  // Email and redirection state
+  const [email, setEmail] = useState("");
   const [formErrors, setFormErrors] = useState<string>("");
   const [isPaying, setIsPaying] = useState(false);
 
@@ -130,36 +127,62 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     }
   }, [step]);
 
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, "").substring(0, 16);
-    // Format card number with spaces every 4 characters
-    const formatted = val.replace(/(\d{4})(?=\d)/g, "$1 ");
-    setCardNumber(formatted);
-  };
-
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, "").substring(0, 4);
-    if (val.length >= 2) {
-      setCardExpiry(val.substring(0, 2) + "/" + val.substring(2));
-    } else {
-      setCardExpiry(val);
+  const getGumroadUrl = () => {
+    let baseUrl = "https://gumroad.com/l/vinpremium-gold";
+    if (selectedPlan?.id === "diamond") {
+      baseUrl = (import.meta as any).env.VITE_GUMROAD_DIAMOND_URL || "https://gumroad.com/l/vinpremium-diamond";
+    } else if (selectedPlan?.id === "gold") {
+      baseUrl = (import.meta as any).env.VITE_GUMROAD_GOLD_URL || "https://gumroad.com/l/vinpremium-gold";
+    } else if (selectedPlan?.id === "silver") {
+      baseUrl = "https://gumroad.com/l/vinpremium-silver";
     }
+
+    const currentHost = window.location.origin;
+    const redirectUrl = `${currentHost}/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+    
+    return `${baseUrl}?email=${encodeURIComponent(email)}&registration_number=${encodeURIComponent(vinOrPlate)}&registration=${encodeURIComponent(vinOrPlate)}&redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
-  const handlePay = (e: React.FormEvent) => {
+  const handlePayRedirect = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cardNumber || !cardExpiry || !cardCvv || !cardName) {
-      setFormErrors("Please complete all payment fields.");
+    if (!email) {
+      setFormErrors("Please enter a valid email address.");
       return;
     }
     setFormErrors("");
     setIsPaying(true);
+    
+    // Open Gumroad checkout in a brand new tab/window
+    const checkoutUrl = getGumroadUrl();
+    window.open(checkoutUrl, "_blank");
+    
+    // Immediately redirect the current page to our premium success verification loader
+    const successUrl = `/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+    window.location.href = successUrl;
+  };
 
-    // Simulated API charge payment delay
-    setTimeout(() => {
+  const handleSimulatePayment = async () => {
+    if (!email) {
+      setFormErrors("Please enter an email address to run the simulation.");
+      return;
+    }
+    
+    setIsPaying(true);
+    setFormErrors("");
+    try {
+      const response = await fetch(`/api/gumroad-webhook?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&product_id=${encodeURIComponent(selectedPlan?.id || "gold")}&product_name=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}`);
+      
+      if (response.ok) {
+        // Redirect to success page so it polls, verifies, and unlocks!
+        window.location.href = `/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+      } else {
+        setFormErrors("Simulation failed. Could not communicate with webhook endpoint.");
+      }
+    } catch (err) {
+      setFormErrors("Simulation error. Check that server is running.");
+    } finally {
       setIsPaying(false);
-      setStep("success");
-    }, 2000);
+    }
   };
 
   return (
@@ -403,7 +426,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
               </motion.div>
             )}
 
-            {/* Step 4: Secure Checkout Credit Card Form */}
+            {/* Step 4: Secure Checkout Email and Redirect */}
             {step === "checkout" && selectedPlan && (
               <motion.div
                 key="checkout"
@@ -419,17 +442,17 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                     className="flex items-center space-x-2 text-xs text-gray-500 hover:text-red-600 mb-6 font-semibold cursor-pointer"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
-                    <span>Change Subscription Plan</span>
+                    <span>Change Plan</span>
                   </button>
 
                   <h3 className="font-display font-bold text-xl text-gray-900 mb-1">
-                    Secure Credit Card Checkout
+                    Complete Checkout via Gumroad
                   </h3>
                   <p className="font-sans text-xs text-gray-500 mb-6">
-                    Enter your banking details. Payments are processed with bank-level 256-bit AES encryption.
+                    Enter your email to secure your vehicle history report and official PDF certificate before proceeding.
                   </p>
 
-                  <form onSubmit={handlePay} className="space-y-4">
+                  <form onSubmit={handlePayRedirect} className="space-y-5">
                     
                     {formErrors && (
                       <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded-r-lg text-xs font-sans text-red-800 font-medium">
@@ -437,88 +460,63 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                       </div>
                     )}
 
-                    {/* Cardholder Name */}
+                    {/* Email Input */}
                     <div>
-                      <label className="block text-xs font-sans font-semibold text-gray-700 mb-1">
-                        Cardholder Name
+                      <label className="block text-xs font-sans font-semibold text-gray-700 mb-1.5">
+                        Your Email Address
                       </label>
                       <input
-                        type="text"
-                        placeholder="e.g. Alexander Sterling"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600"
                         required
                       />
+                      <p className="text-[10px] text-gray-400 mt-1.5">
+                        Your official printable PDF certificate and invoice will be registered and delivered to this address.
+                      </p>
                     </div>
 
-                    {/* Card Number */}
-                    <div>
-                      <label className="block text-xs font-sans font-semibold text-gray-700 mb-1">
-                        Card Number
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="4111 2222 3333 4444"
-                          value={cardNumber}
-                          onChange={handleCardNumberChange}
-                          className="w-full border border-gray-200 rounded-lg pl-10 pr-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600"
-                          required
-                        />
-                        <CreditCard className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
-                      </div>
-                    </div>
-
-                    {/* Grid for Expiry & CVV */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-sans font-semibold text-gray-700 mb-1">
-                          Expiry Date
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="MM/YY"
-                          value={cardExpiry}
-                          onChange={handleExpiryChange}
-                          className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 text-center"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-sans font-semibold text-gray-700 mb-1">
-                          CVV Code
-                        </label>
-                        <input
-                          type="password"
-                          placeholder="•••"
-                          maxLength={3}
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ""))}
-                          className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 text-center"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="pt-4">
+                    <div className="pt-2 space-y-3">
                       <button
                         type="submit"
                         disabled={isPaying}
-                        className="w-full bg-red-600 text-white font-sans font-bold text-sm py-3 rounded-lg hover:bg-red-700 transition-all shadow-md shadow-red-200 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-80"
+                        className="w-full bg-red-600 text-white font-sans font-bold text-sm py-3.5 rounded-lg hover:bg-red-700 transition-all shadow-md shadow-red-200 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-80"
                       >
                         {isPaying ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Processing Secure Payment...</span>
+                            <span>Redirecting to Gumroad Gateway...</span>
                           </>
                         ) : (
                           <>
                             <Lock className="w-4 h-4" />
-                            <span>Pay & Decrypt Full Report (£{selectedPlan.price} GBP)</span>
+                            <span>Unlock via Secure Gumroad Checkout (£{selectedPlan.price} GBP)</span>
                           </>
                         )}
                       </button>
+
+                      {/* Developer Sandbox Section */}
+                      <div className="border-t border-dashed border-gray-200 pt-4 mt-4">
+                        <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-4">
+                          <p className="text-[10px] font-mono font-bold text-amber-800 uppercase tracking-wider mb-1">
+                            DEVELOPER SANDBOX & REVIEW MODE
+                          </p>
+                          <p className="text-[11px] text-amber-700 leading-relaxed mb-3">
+                            Click below to immediately trigger a mock webhook ping and test the full checkout success flow (bypassing live payments).
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleSimulatePayment}
+                            disabled={isPaying}
+                            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-sans font-bold text-xs py-2.5 rounded-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                          >
+                            <span>Simulate Instant Webhook & Success</span>
+                          </button>
+                        </div>
+                      </div>
+
                     </div>
 
                   </form>

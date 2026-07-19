@@ -29,6 +29,8 @@ import PrivacyView from "./components/PrivacyView";
 import AffiliateView from "./components/AffiliateView";
 import PaymentWizard from "./components/PaymentWizard";
 import ReportViewer from "./components/ReportViewer";
+import SuccessView from "./components/SuccessView";
+import CancelView from "./components/CancelView";
 import { VehicleReport } from "./types";
 import { generateSimulatedReport } from "./lib/mockDatabase";
 
@@ -36,7 +38,7 @@ import { generateSimulatedReport } from "./lib/mockDatabase";
 const carBanner = "/car_banner_1784095133179.jpg";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "success" | "cancel">("home");
   const [vinOrPlate, setVinOrPlate] = useState("");
   const [searchType, setSearchType] = useState<"vin" | "plate">("plate");
   
@@ -63,6 +65,48 @@ export default function App() {
       }
     }
   }, [activeTab]);
+
+  // Handle path-based routing on load
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === "/success") {
+      setActiveTab("success");
+    } else if (path === "/cancel") {
+      setActiveTab("cancel");
+    }
+  }, []);
+
+  const handleNavigateHome = () => {
+    window.history.pushState({}, "", "/");
+    setActiveTab("home");
+  };
+
+  const handleUnlockReport = async (registration: string) => {
+    window.history.pushState({}, "", "/");
+    setLoading(true);
+    setScanStep(0);
+    
+    try {
+      const response = await fetch("/api/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vinOrPlate: registration, type: "plate" }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setReport(data);
+      } else {
+        setReport(generateSimulatedReport(registration, "plate"));
+      }
+    } catch (e) {
+      setReport(generateSimulatedReport(registration, "plate"));
+    }
+    
+    setIsUnlocked(true);
+    setLoading(false);
+    setActiveTab("report");
+  };
 
   const handleSelectPlanFromHome = () => {
     // Scroll back to search input and focus
@@ -208,6 +252,21 @@ export default function App() {
 
         {/* VIEW: AFFILIATE PROGRAM */}
         {activeTab === "affiliate" && <AffiliateView />}
+
+        {/* VIEW: SUCCESS VIEW */}
+        {activeTab === "success" && (
+          <SuccessView 
+            onUnlockReport={handleUnlockReport} 
+            onNavigateHome={handleNavigateHome} 
+          />
+        )}
+
+        {/* VIEW: CANCEL VIEW */}
+        {activeTab === "cancel" && (
+          <CancelView 
+            onNavigateHome={handleNavigateHome} 
+          />
+        )}
 
         {/* VIEW: ACTIVE REPORT */}
         {activeTab === "report" && report && (

@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -36,6 +37,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // API endpoint for vehicle reports
   app.post("/api/report", async (req, res) => {
@@ -243,6 +245,213 @@ Return ONLY valid JSON and do not wrap in markdown blocks.`;
     // Fallback: high-fidelity local generator
     const report = generateSimulatedReport(cleanInput);
     return res.json(report);
+  });
+
+  // Local JSON File Database for storing payments
+  const PAYMENTS_FILE = path.join(process.cwd(), "payments.json");
+
+  interface PaymentInfo {
+    email: string;
+    product_id: string;
+    product_name: string;
+    order_id: string;
+    registration_number: string;
+    payment_status: string;
+    purchase_date: string;
+    license_key?: string;
+  }
+
+  function readPayments(): PaymentInfo[] {
+    try {
+      if (!fs.existsSync(PAYMENTS_FILE)) {
+        return [];
+      }
+      const data = fs.readFileSync(PAYMENTS_FILE, "utf-8");
+      return JSON.parse(data) || [];
+    } catch (err) {
+      console.error("Error reading payments file:", err);
+      return [];
+    }
+  }
+
+  function writePayments(payments: PaymentInfo[]) {
+    try {
+      fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(payments, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Error writing payments file:", err);
+    }
+  }
+
+  // GET /api/check-payment
+  app.get("/api/check-payment", (req, res) => {
+    const email = String(req.query.email || "").trim().toLowerCase();
+    const registration = String(req.query.registration || req.query.registration_number || "").trim().toUpperCase();
+    const key = String(req.query.key || req.query.payment_id || req.query.order_id || req.query.sale_id || "").trim();
+
+    const payments = readPayments();
+
+    // 1. First priority: Check by specific key / transaction ID / license key
+    if (key) {
+      const record = payments.find(p => 
+        (p.order_id && p.order_id.toLowerCase() === key.toLowerCase()) ||
+        (p.license_key && p.license_key.toLowerCase() === key.toLowerCase())
+      );
+
+      if (record && (record.payment_status === "paid" || record.payment_status === "completed")) {
+        return res.json({ 
+          paid: true, 
+          registration: record.registration_number, 
+          email: record.email,
+          order_id: record.order_id,
+          license_key: record.license_key || ""
+        });
+      }
+    }
+
+    // 2. Second priority: Check by email and registration
+    if (email && registration) {
+      const record = payments.find(p => 
+        p.email === email && 
+        p.registration_number === registration && 
+        (p.payment_status === "paid" || p.payment_status === "completed")
+      );
+
+      if (record) {
+        return res.json({ 
+          paid: true, 
+          registration: record.registration_number, 
+          email: record.email,
+          order_id: record.order_id,
+          license_key: record.license_key || ""
+        });
+      }
+    }
+
+    return res.json({ paid: false });
+  });
+
+  // POST /api/gumroad-webhook
+  app.post("/api/gumroad-webhook", (req, res) => {
+    console.log("Received Gumroad webhook payload:", req.body);
+
+    const body = req.body || {};
+    
+    // Extract fields with flexible fallbacks
+    const email = (body.email || body.buyer_email || body.customer_email || "").trim().toLowerCase();
+    const product_id = (body.product_id || body.permalink || "gold-check");
+    const product_name = (body.product_name || "Gold Ultimate Check");
+    const order_id = String(body.order_number || body.sale_id || body.id || "ord_" + Math.random().toString(36).substring(2, 9));
+    const license_key = (body.license_key || "").trim();
+    
+    // Extract registration number from root or custom_fields
+    let registration_number = "";
+    if (body.registration_number) {
+      registration_number = body.registration_number;
+    } else if (body.registration) {
+      registration_number = body.registration;
+    } else if (body.plate) {
+      registration_number = body.plate;
+    } else if (body.custom_fields) {
+      let customFieldsObj = body.custom_fields;
+      if (typeof customFieldsObj === "string") {
+        try {
+          customFieldsObj = JSON.parse(customFieldsObj);
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+      if (typeof customFieldsObj === "object" && customFieldsObj !== null) {
+        registration_number = 
+          customFieldsObj.registration_number || 
+          customFieldsObj.registration || 
+          customFieldsObj.plate || 
+          customFieldsObj["Registration Number"] || 
+          customFieldsObj["registration_number"] || 
+          "";
+      }
+    }
+
+    // Fallback to query params if any
+    if (!registration_number && req.query.registration) {
+      registration_number = String(req.query.registration);
+    }
+    if (!registration_number && req.query.registration_number) {
+      registration_number = String(req.query.registration_number);
+    }
+
+    registration_number = registration_number.trim().toUpperCase();
+
+    const payment_status = (body.payment_status || "paid").trim().toLowerCase();
+    const purchase_date = body.created_at || new Date().toISOString();
+
+    if (!email || !registration_number) {
+      console.warn("Webhook Warning: Missing critical details. email:", email, "registration_number:", registration_number);
+    }
+
+    const payments = readPayments();
+    
+    // Avoid duplicates by order ID
+    const existingIndex = payments.findIndex(p => p.order_id === order_id);
+    
+    const paymentRecord: PaymentInfo = {
+      email,
+      product_id,
+      product_name,
+      order_id,
+      registration_number,
+      payment_status: "paid", // webhook ping indicates payment success
+      purchase_date,
+      license_key: license_key || undefined
+    };
+
+    if (existingIndex > -1) {
+      payments[existingIndex] = paymentRecord;
+    } else {
+      payments.push(paymentRecord);
+    }
+
+    writePayments(payments);
+    console.log(`Stored payment: Email=${email}, Plate=${registration_number}, OrderID=${order_id}, LicenseKey=${license_key}`);
+
+    return res.json({ success: true, message: "Webhook processed and stored." });
+  });
+
+  // GET /api/gumroad-webhook (Convenience GET endpoint for easy testing / simulation)
+  app.get("/api/gumroad-webhook", (req, res) => {
+    const email = String(req.query.email || "").trim().toLowerCase();
+    const registration = String(req.query.registration || req.query.registration_number || "").trim().toUpperCase();
+    const product_id = String(req.query.product_id || "gold-check");
+    const product_name = String(req.query.product_name || "Gold Ultimate Check");
+    const order_key = String(req.query.key || req.query.payment_id || req.query.order_id || "").trim();
+
+    if (!email || !registration) {
+      return res.status(400).json({ error: "email and registration query parameters are required for GET simulation" });
+    }
+
+    const payments = readPayments();
+    const order_id = order_key || "sim_" + Math.random().toString(36).substring(2, 9).toUpperCase();
+    const license_key = "lic_" + Math.random().toString(36).substring(2, 9).toUpperCase();
+    
+    const paymentRecord: PaymentInfo = {
+      email,
+      product_id,
+      product_name,
+      order_id,
+      registration_number: registration,
+      payment_status: "paid",
+      purchase_date: new Date().toISOString(),
+      license_key
+    };
+
+    payments.push(paymentRecord);
+    writePayments(payments);
+    console.log(`Simulated payment stored: Email=${email}, Plate=${registration}, OrderID=${order_id}, LicenseKey=${license_key}`);
+
+    return res.json({
+      success: true,
+      message: "Simulation payment created successfully",
+      payment: paymentRecord
+    });
   });
 
   // Setup Vite Dev Server / Static files

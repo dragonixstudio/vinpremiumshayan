@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-// @ts-ignore
-import html2pdf from "html2pdf.js";
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -38,12 +36,36 @@ interface ReportViewerProps {
   onUnlockClick: () => void;
 }
 
+// Dynamically load html2pdf from CDN to guarantee perfect execution in sandboxed environments
+const loadHtml2Pdf = (): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if ((window as any).html2pdf) {
+      resolve((window as any).html2pdf);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+    script.crossOrigin = "anonymous";
+    script.onload = () => {
+      if ((window as any).html2pdf) {
+        resolve((window as any).html2pdf);
+      } else {
+        reject(new Error("html2pdf failed to bind to window.html2pdf"));
+      }
+    };
+    script.onerror = () => {
+      reject(new Error("Failed to load html2pdf from CDN"));
+    };
+    document.body.appendChild(script);
+  });
+};
+
 export default function ReportViewer({ report, isUnlocked, onUnlockClick }: ReportViewerProps) {
   const [expandedMot, setExpandedMot] = useState<number | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Print utility that generates clean downloadable PDF
-  const handlePrint = () => {
+  const handlePrint = async () => {
     setIsGeneratingPdf(true);
     const element = document.getElementById("printable-report-content");
     if (!element) {
@@ -59,18 +81,27 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
       jsPDF:        { unit: "mm", format: "a4", orientation: "portrait" as const }
     };
 
-    // @ts-ignore
-    html2pdf()
-      .from(element)
-      .set(opt)
-      .save()
-      .then(() => {
-        setIsGeneratingPdf(false);
-      })
-      .catch((err: any) => {
-        console.error("PDF generation error:", err);
-        setIsGeneratingPdf(false);
-      });
+    try {
+      const exporter = await loadHtml2Pdf();
+      exporter()
+        .from(element)
+        .set(opt)
+        .save()
+        .then(() => {
+          setIsGeneratingPdf(false);
+        })
+        .catch((err: any) => {
+          console.error("PDF generation promise error:", err);
+          setIsGeneratingPdf(false);
+          // Fallback to native print if any error occurs
+          window.print();
+        });
+    } catch (err) {
+      console.error("Failed to load html2pdf exporter:", err);
+      // Fallback to native print
+      window.print();
+      setIsGeneratingPdf(false);
+    }
   };
 
   const scoreColor = report.score >= 90 
