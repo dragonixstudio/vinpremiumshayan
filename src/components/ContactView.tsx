@@ -153,7 +153,7 @@ export default function ContactView() {
                 </div>
                 <div className="flex items-center space-x-3 border-t border-gray-100 pt-3">
                   <Mail className="w-4.5 h-4.5 text-red-600 shrink-0" />
-                  <span><strong>Corporate Support:</strong> compliance@vinpremium.uk</span>
+                  <span><strong>Corporate Support:</strong> compliance@vinpremium.co.uk</span>
                 </div>
               </div>
             </div>

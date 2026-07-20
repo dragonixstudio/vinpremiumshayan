@@ -1,5 +1,5 @@
 {
-  "name": "VinPremium.uk",
+  "name": "VinPremium.co.uk",
   "description": "Premium and comprehensive vehicle history reporting by VIN or License Plate.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

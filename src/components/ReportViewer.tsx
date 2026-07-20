@@ -209,7 +209,7 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             </div>
             <div>
               <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Model Year</p>
-              <p className="font-display font-bold text-sm text-gray-800">{report.year}</p>
+              <p className={`font-display font-bold text-sm text-gray-800 transition-all ${!isUnlocked ? "blur-xs select-none" : ""}`}>{report.year}</p>
             </div>
           </div>
 
@@ -231,7 +231,7 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             </div>
             <div>
               <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total Mileage</p>
-              <p className="font-mono font-bold text-sm text-gray-800">
+              <p className={`font-mono font-bold text-sm text-gray-800 transition-all ${!isUnlocked ? "blur-xs select-none" : ""}`}>
                 {report.mileageHistory[report.mileageHistory.length - 1]?.mileage.toLocaleString() || "Locked"} mi
               </p>
             </div>
@@ -243,7 +243,7 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             </div>
             <div>
               <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Prev Owners</p>
-              <p className="font-display font-bold text-sm text-gray-800">{report.previousOwners}</p>
+              <p className={`font-display font-bold text-sm text-gray-800 transition-all ${!isUnlocked ? "blur-xs select-none" : ""}`}>{report.previousOwners}</p>
             </div>
           </div>
 
@@ -259,29 +259,42 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             
             {/* Check 1: Stolen */}
-            <div className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between border-gray-100 transition-all ${
+                !isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""
+              }`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Police Stolen Check</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">National Stolen Registry</h4>
               </div>
-              <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                <Check className="w-3.5 h-3.5" />
-                <span>{report.stolenStatus}</span>
-              </div>
+              {!isUnlocked ? (
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{report.stolenStatus}</span>
+                </div>
+              )}
             </div>
 
             {/* Check 2: Finance */}
-            <div className={`border rounded-xl p-4 flex items-center justify-between ${
-              report.financeOutstanding === "YES" && isUnlocked ? "border-red-100 bg-red-50/10" : "border-gray-100"
-            }`}>
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between transition-all ${
+                report.financeOutstanding === "YES" && isUnlocked ? "border-red-100 bg-red-50/10" : "border-gray-100"
+              } ${!isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""}`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Outstanding Finance</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">Active Finance Liens</h4>
               </div>
               {!isUnlocked ? (
-                <div className="flex items-center space-x-1 bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-semibold select-none">
-                  <Lock className="w-3 h-3" />
-                  <span>CENSORED</span>
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
                 </div>
               ) : report.financeOutstanding === "YES" ? (
                 <div className="flex items-center space-x-1 bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
@@ -297,17 +310,19 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             </div>
 
             {/* Check 3: Written-off */}
-            <div className={`border rounded-xl p-4 flex items-center justify-between ${
-              report.writeOffStatus !== "CLEAN" && isUnlocked ? "border-red-100 bg-red-50/10" : "border-gray-100"
-            }`}>
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between transition-all ${
+                report.writeOffStatus !== "CLEAN" && isUnlocked ? "border-red-100 bg-red-50/10" : "border-gray-100"
+              } ${!isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""}`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Insurance Write-off</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">MIAFTR Log Categories</h4>
               </div>
               {!isUnlocked ? (
-                <div className="flex items-center space-x-1 bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-semibold select-none">
-                  <Lock className="w-3 h-3" />
-                  <span>CENSORED</span>
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
                 </div>
               ) : report.writeOffStatus !== "CLEAN" ? (
                 <div className="flex items-center space-x-1 bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
@@ -323,39 +338,72 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             </div>
 
             {/* Check 4: Scrapped */}
-            <div className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between border-gray-100 transition-all ${
+                !isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""
+              }`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Scrapped Status</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">DVLA Scrappage Registry</h4>
               </div>
-              <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                <Check className="w-3.5 h-3.5" />
-                <span>NO</span>
-              </div>
+              {!isUnlocked ? (
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>NO</span>
+                </div>
+              )}
             </div>
 
             {/* Check 5: Imported */}
-            <div className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between border-gray-100 transition-all ${
+                !isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""
+              }`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Import/Export Record</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">HMRC Port Logs Check</h4>
               </div>
-              <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                <Check className="w-3.5 h-3.5" />
-                <span>{report.importedStatus}</span>
-              </div>
+              {!isUnlocked ? (
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{report.importedStatus}</span>
+                </div>
+              )}
             </div>
 
             {/* Check 6: VIC Subject */}
-            <div className="border border-gray-100 rounded-xl p-4 flex items-center justify-between">
-              <div>
+            <div 
+              onClick={!isUnlocked ? onUnlockClick : undefined}
+              className={`border rounded-xl p-4 flex items-center justify-between border-gray-100 transition-all ${
+                !isUnlocked ? "cursor-pointer group hover:bg-gray-50/50" : ""
+              }`}
+            >
+              <div className={!isUnlocked ? "blur-xs select-none" : ""}>
                 <p className="font-sans text-[10px] text-gray-400 uppercase tracking-wider font-semibold">VIC Subject Check</p>
                 <h4 className="font-display font-bold text-sm text-gray-800">Identity Inspections</h4>
               </div>
-              <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                <Check className="w-3.5 h-3.5" />
-                <span>NO</span>
-              </div>
+              {!isUnlocked ? (
+                <div className="text-gray-400 p-2 group-hover:scale-110 transition-transform">
+                  <Lock className="w-4 h-4 text-red-600 animate-pulse" />
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>NO</span>
+                </div>
+              )}
             </div>
 
           </div>
@@ -368,8 +416,8 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             <span>DVLA Registered Specifications</span>
           </h3>
           
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+          <div className="relative overflow-hidden rounded-xl border border-gray-100">
+            <div className={`grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 transition-all duration-300 ${!isUnlocked ? "blur-[6px] select-none pointer-events-none opacity-80" : ""}`}>
               
               <div className="divide-y divide-gray-100">
                 <div className="grid grid-cols-2 px-6 py-3 text-xs font-sans">
@@ -418,6 +466,16 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
               </div>
 
             </div>
+            {!isUnlocked && (
+              <div 
+                onClick={onUnlockClick}
+                className="absolute inset-0 bg-white/20 hover:bg-white/30 backdrop-blur-[2px] transition-all flex flex-col items-center justify-center cursor-pointer group z-10"
+              >
+                <div className="bg-white border border-gray-150 shadow-xl rounded-full p-4 group-hover:scale-110 transition-transform flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-red-600 animate-pulse" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -431,48 +489,60 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             We mapped {report.mileageHistory.length} chronological database updates to scan for mileage clocking frauds.
           </p>
 
-          <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={report.mileageHistory}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: 10, fontFamily: "JetBrains Mono" }} />
-                  <YAxis stroke="#9ca3af" style={{ fontSize: 10, fontFamily: "JetBrains Mono" }} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: 8, border: "1px solid #f3f4f6", fontFamily: "Inter" }}
-                    labelStyle={{ fontWeight: "bold" }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="mileage" 
-                    stroke="#dc2626" 
-                    strokeWidth={3} 
-                    activeDot={{ r: 8 }} 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-gray-200/50 overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[400px]">
-                <thead>
-                  <tr className="border-b border-gray-200 text-gray-400 text-[10px] font-sans font-bold uppercase tracking-wider">
-                    <th className="pb-2">Audit Date</th>
-                    <th className="pb-2">Source Agency</th>
-                    <th className="pb-2 text-right">Odometer Mileage</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 font-sans text-xs text-gray-700">
-                  {report.mileageHistory.map((row, i) => (
-                    <tr key={i} className="hover:bg-white/50">
-                      <td className="py-2.5 font-mono">{row.date}</td>
-                      <td className="py-2.5 font-medium">{row.source}</td>
-                      <td className="py-2.5 text-right font-mono font-bold text-gray-900">{row.mileage.toLocaleString()} mi</td>
+          <div className="relative overflow-hidden rounded-xl border border-gray-100">
+            <div className={`p-6 bg-gray-50 transition-all duration-300 ${!isUnlocked ? "blur-[6px] select-none pointer-events-none opacity-80" : ""}`}>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={report.mileageHistory}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: 10, fontFamily: "JetBrains Mono" }} />
+                    <YAxis stroke="#9ca3af" style={{ fontSize: 10, fontFamily: "JetBrains Mono" }} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: 8, border: "1px solid #f3f4f6", fontFamily: "Inter" }}
+                      labelStyle={{ fontWeight: "bold" }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="mileage" 
+                      stroke="#dc2626" 
+                      strokeWidth={3} 
+                      activeDot={{ r: 8 }} 
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-200/50 overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[400px]">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-400 text-[10px] font-sans font-bold uppercase tracking-wider">
+                      <th className="pb-2">Audit Date</th>
+                      <th className="pb-2">Source Agency</th>
+                      <th className="pb-2 text-right">Odometer Mileage</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-sans text-xs text-gray-700">
+                    {report.mileageHistory.map((row, i) => (
+                      <tr key={i} className="hover:bg-white/50">
+                        <td className="py-2.5 font-mono">{row.date}</td>
+                        <td className="py-2.5 font-medium">{row.source}</td>
+                        <td className="py-2.5 text-right font-mono font-bold text-gray-900">{row.mileage.toLocaleString()} mi</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+            {!isUnlocked && (
+              <div 
+                onClick={onUnlockClick}
+                className="absolute inset-0 bg-white/20 hover:bg-white/30 backdrop-blur-[2px] transition-all flex flex-col items-center justify-center cursor-pointer group z-10"
+              >
+                <div className="bg-white border border-gray-150 shadow-xl rounded-full p-4 group-hover:scale-110 transition-transform flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-red-600 animate-pulse" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -486,96 +556,108 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
             Complete records of annually mandated UK safety and emissions testing.
           </p>
 
-          <div className="space-y-4">
-            {report.motHistory.length === 0 ? (
-              <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
-                No MOT history available. This vehicle may be under 3 years old or imported.
-              </div>
-            ) : (
-              report.motHistory.map((mot, i) => {
-                const isPass = mot.result === "Pass";
-                const isExpanded = expandedMot === i;
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`border rounded-xl overflow-hidden transition-all ${
-                      isPass ? "border-gray-100" : "border-red-100 bg-red-50/5"
-                    }`}
-                  >
-                    {/* Header bar of record */}
+          <div className="relative overflow-hidden rounded-xl border border-gray-100">
+            <div className={`space-y-4 p-4 transition-all duration-300 ${!isUnlocked ? "blur-[6px] select-none pointer-events-none opacity-80" : ""}`}>
+              {report.motHistory.length === 0 ? (
+                <div className="bg-gray-50 border border-gray-100 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
+                  No MOT history available. This vehicle may be under 3 years old or imported.
+                </div>
+              ) : (
+                report.motHistory.map((mot, i) => {
+                  const isPass = mot.result === "Pass";
+                  const isExpanded = expandedMot === i;
+                  
+                  return (
                     <div 
-                      onClick={() => setExpandedMot(isExpanded ? null : i)}
-                      className="bg-gray-50/60 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center cursor-pointer hover:bg-gray-100/50 transition-colors space-y-2 sm:space-y-0"
+                      key={i} 
+                      className={`border rounded-xl overflow-hidden transition-all ${
+                        isPass ? "border-gray-100" : "border-red-100 bg-red-50/5"
+                      }`}
                     >
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-sans font-bold tracking-wider uppercase ${
-                          isPass ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                        }`}>
-                          {mot.result}
-                        </span>
-                        <div>
-                          <p className="font-display font-bold text-xs text-gray-800">Test Date: {mot.date}</p>
-                          <p className="font-mono text-[10px] text-gray-400">Ref: {mot.testNumber}</p>
+                      {/* Header bar of record */}
+                      <div 
+                        onClick={() => setExpandedMot(isExpanded ? null : i)}
+                        className="bg-gray-50/60 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center cursor-pointer hover:bg-gray-100/50 transition-colors space-y-2 sm:space-y-0"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-sans font-bold tracking-wider uppercase ${
+                            isPass ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          }`}>
+                            {mot.result}
+                          </span>
+                          <div>
+                            <p className="font-display font-bold text-xs text-gray-800">Test Date: {mot.date}</p>
+                            <p className="font-mono text-[10px] text-gray-400">Ref: {mot.testNumber}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-6 text-xs">
+                          <div>
+                            <span className="text-gray-400 font-sans">Tested Mileage</span>
+                            <p className="font-mono font-bold text-gray-800 text-right">{mot.odometer.toLocaleString()} mi</p>
+                          </div>
+                          {mot.expiryDate && (
+                            <div className="text-right">
+                              <span className="text-gray-400 font-sans">Expiry Date</span>
+                              <p className="font-mono font-medium text-gray-800">{mot.expiryDate}</p>
+                            </div>
+                          )}
+                          <span className="text-gray-400 font-bold ml-2 print:hidden">{isExpanded ? "▲" : "▼"}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-6 text-xs">
-                        <div>
-                          <span className="text-gray-400 font-sans">Tested Mileage</span>
-                          <p className="font-mono font-bold text-gray-800 text-right">{mot.odometer.toLocaleString()} mi</p>
-                        </div>
-                        {mot.expiryDate && (
-                          <div className="text-right">
-                            <span className="text-gray-400 font-sans">Expiry Date</span>
-                            <p className="font-mono font-medium text-gray-800">{mot.expiryDate}</p>
+                      {/* Expandable failure/advisory list */}
+                      <div className={`p-4 bg-white border-t border-gray-100 divide-y divide-gray-100 ${isExpanded ? "block" : "hidden print:block"}`}>
+                        {/* Failures */}
+                        {mot.failures && mot.failures.length > 0 && (
+                          <div className="pb-3 mb-3">
+                            <h5 className="font-display font-bold text-xs text-red-700 flex items-center space-x-1 mb-2">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>Critical Test Failure Reasons:</span>
+                            </h5>
+                            <ul className="list-disc list-inside font-sans text-xs text-gray-700 space-y-1.5 pl-2">
+                              {mot.failures.map((f: string, idx: number) => (
+                                <li key={idx}>
+                                  {f}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         )}
-                        <span className="text-gray-400 font-bold ml-2 print:hidden">{isExpanded ? "▲" : "▼"}</span>
-                      </div>
-                    </div>
 
-                    {/* Expandable failure/advisory list */}
-                    <div className={`p-4 bg-white border-t border-gray-100 divide-y divide-gray-100 ${isExpanded ? "block" : "hidden print:block"}`}>
-                      {/* Failures */}
-                      {mot.failures && mot.failures.length > 0 && (
-                        <div className="pb-3 mb-3">
-                          <h5 className="font-display font-bold text-xs text-red-700 flex items-center space-x-1 mb-2">
+                        {/* Advisories */}
+                        <div>
+                          <h5 className="font-display font-semibold text-xs text-yellow-700 flex items-center space-x-1 mb-2 mt-2">
                             <AlertTriangle className="w-3.5 h-3.5" />
-                            <span>Critical Test Failure Reasons:</span>
+                            <span>Advisory Notice Items:</span>
                           </h5>
-                          <ul className="list-disc list-inside font-sans text-xs text-gray-700 space-y-1.5 pl-2">
-                            {mot.failures.map((f: string, idx: number) => (
-                              <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
-                                {!isUnlocked ? "Censored failure reason details on preview" : f}
-                              </li>
-                            ))}
-                          </ul>
+                          {mot.advisories && mot.advisories.length > 0 ? (
+                            <ul className="list-disc list-inside font-sans text-xs text-gray-600 space-y-1 pl-2">
+                              {mot.advisories.map((adv: string, idx: number) => (
+                                <li key={idx}>
+                                  {adv}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="font-sans text-xs text-gray-400 pl-2">No active advisories noted.</p>
+                          )}
                         </div>
-                      )}
-
-                      {/* Advisories */}
-                      <div>
-                        <h5 className="font-display font-semibold text-xs text-yellow-700 flex items-center space-x-1 mb-2 mt-2">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          <span>Advisory Notice Items:</span>
-                        </h5>
-                        {mot.advisories && mot.advisories.length > 0 ? (
-                          <ul className="list-disc list-inside font-sans text-xs text-gray-600 space-y-1 pl-2">
-                            {mot.advisories.map((adv: string, idx: number) => (
-                              <li key={idx} className={!isUnlocked ? "blur-xs select-none" : ""}>
-                                {!isUnlocked ? "Censored advisory notice item log" : adv}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="font-sans text-xs text-gray-400 pl-2">No active advisories noted.</p>
-                        )}
                       </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
+              )}
+            </div>
+            {!isUnlocked && (
+              <div 
+                onClick={onUnlockClick}
+                className="absolute inset-0 bg-white/20 hover:bg-white/30 backdrop-blur-[2px] transition-all flex flex-col items-center justify-center cursor-pointer group z-10"
+              >
+                <div className="bg-white border border-gray-150 shadow-xl rounded-full p-4 group-hover:scale-110 transition-transform flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-red-600 animate-pulse" />
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -584,64 +666,90 @@ export default function ReportViewer({ report, isUnlocked, onUnlockClick }: Repo
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 print:break-inside-avoid">
           
           {/* Accident History */}
-          <div className="border border-gray-100 rounded-2xl p-6">
+          <div className="border border-gray-100 rounded-2xl p-6 relative overflow-hidden flex flex-col">
             <h3 className="font-display font-bold text-base text-gray-900 mb-4 flex items-center space-x-2">
               <ShieldAlert className="w-5 h-5 text-red-600" />
               <span>Accident Log & Damage Inspections</span>
             </h3>
 
-            {report.accidentHistory.length === 0 ? (
-              <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
-                No structural accident records identified by insurance databases (CLEAN).
-              </div>
-            ) : (
-              report.accidentHistory.map((acc, i) => (
-                <div key={i} className="bg-red-50/10 border border-red-100 rounded-xl p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-mono text-xs text-gray-400">{acc.date}</span>
-                    <span className="bg-red-100 text-red-800 text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
-                      {acc.severity} Impact
-                    </span>
-                  </div>
-                  <h5 className="font-display font-bold text-xs text-gray-800 mb-1">Point of Impact: {acc.pointOfImpact}</h5>
-                  <p className={`font-sans text-xs text-gray-600 leading-normal mb-3 ${!isUnlocked ? "blur-xs select-none" : ""}`}>
-                    {!isUnlocked ? "Detailed structural accident collision reports are locked." : acc.description}
-                  </p>
-                  <div className="flex items-center space-x-2 text-[10px] font-sans font-semibold text-green-700">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Insurance Certified Repair Complete</span>
-                  </div>
+            <div className={`flex-1 transition-all duration-300 ${!isUnlocked ? "blur-[6px] select-none pointer-events-none opacity-80" : ""}`}>
+              {report.accidentHistory.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
+                  No structural accident records identified by insurance databases (CLEAN).
                 </div>
-              ))
+              ) : (
+                report.accidentHistory.map((acc, i) => (
+                  <div key={i} className="bg-red-50/10 border border-red-100 rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-mono text-xs text-gray-400">{acc.date}</span>
+                      <span className="bg-red-100 text-red-800 text-[10px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                        {acc.severity} Impact
+                      </span>
+                    </div>
+                    <h5 className="font-display font-bold text-xs text-gray-800 mb-1">Point of Impact: {acc.pointOfImpact}</h5>
+                    <p className="font-sans text-xs text-gray-600 leading-normal mb-3">
+                      {acc.description}
+                    </p>
+                    <div className="flex items-center space-x-2 text-[10px] font-sans font-semibold text-green-700">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Insurance Certified Repair Complete</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {!isUnlocked && (
+              <div 
+                onClick={onUnlockClick}
+                className="absolute inset-0 bg-white/20 hover:bg-white/30 backdrop-blur-[2px] transition-all flex flex-col items-center justify-center cursor-pointer group z-10 pt-10"
+              >
+                <div className="bg-white border border-gray-150 shadow-xl rounded-full p-4 group-hover:scale-110 transition-transform flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-red-600 animate-pulse" />
+                </div>
+              </div>
             )}
           </div>
 
           {/* Safety Recalls */}
-          <div className="border border-gray-100 rounded-2xl p-6">
+          <div className="border border-gray-100 rounded-2xl p-6 relative overflow-hidden flex flex-col">
             <h3 className="font-display font-bold text-base text-gray-900 mb-4 flex items-center space-x-2">
               <Flame className="w-5 h-5 text-red-600" />
               <span>DVSA Safety Recall Bulletins</span>
             </h3>
 
-            {report.recalls.length === 0 ? (
-              <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
-                No active safety recalls issued for this model (CLEAN).
-              </div>
-            ) : (
-              report.recalls.map((rec, i) => (
-                <div key={i} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-mono text-xs text-gray-400">{rec.date}</span>
-                    <span className="bg-green-100 text-green-800 text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-                      {rec.status}
-                    </span>
-                  </div>
-                  <h5 className="font-display font-bold text-xs text-gray-800 mb-1">{rec.component} ({rec.campaignNumber})</h5>
-                  <p className="font-sans text-xs text-gray-500 leading-normal">
-                    {rec.description}
-                  </p>
+            <div className={`flex-1 transition-all duration-300 ${!isUnlocked ? "blur-[6px] select-none pointer-events-none opacity-80" : ""}`}>
+              {report.recalls.length === 0 ? (
+                <div className="bg-gray-50 rounded-xl p-6 text-center text-gray-500 font-sans text-xs">
+                  No active safety recalls issued for this model (CLEAN).
                 </div>
-              ))
+              ) : (
+                report.recalls.map((rec, i) => (
+                  <div key={i} className="border border-gray-100 rounded-xl p-4 mb-3 last:mb-0">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-mono text-xs text-gray-400">{rec.date}</span>
+                      <span className="bg-green-100 text-green-800 text-[10px] font-sans font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                        {rec.status}
+                      </span>
+                    </div>
+                    <h5 className="font-display font-bold text-xs text-gray-800 mb-1">{rec.component} ({rec.campaignNumber})</h5>
+                    <p className="font-sans text-xs text-gray-500 leading-normal">
+                      {rec.description}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {!isUnlocked && (
+              <div 
+                onClick={onUnlockClick}
+                className="absolute inset-0 bg-white/20 hover:bg-white/30 backdrop-blur-[2px] transition-all flex flex-col items-center justify-center cursor-pointer group z-10 pt-10"
+              >
+                <div className="bg-white border border-gray-150 shadow-xl rounded-full p-4 group-hover:scale-110 transition-transform flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-red-600 animate-pulse" />
+                </div>
+              </div>
             )}
           </div>
 

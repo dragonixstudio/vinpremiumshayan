@@ -34,13 +34,13 @@ export default function AboutView() {
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <span className="text-xs font-mono font-bold uppercase tracking-widest text-red-600 bg-red-50 px-3 py-1.5 rounded-full inline-block mb-3">
-            About VinPremium.uk
+            About VinPremium.co.uk
           </span>
           <h1 className="font-display font-bold text-4xl md:text-5xl text-gray-900 tracking-tight leading-none mb-6">
             Securing Your Automotive Investments
           </h1>
           <p className="font-sans text-lg text-gray-600 leading-relaxed">
-            Founded in London, vinpremium.uk provides the ultimate consumer safeguard for vehicle purchases in Great Britain and Northern Ireland. We bring complete transparency to secondary auto markets.
+            Founded in London, vinpremium.co.uk provides the ultimate consumer safeguard for vehicle purchases in Great Britain and Northern Ireland. We bring complete transparency to secondary auto markets.
           </p>
         </div>
 

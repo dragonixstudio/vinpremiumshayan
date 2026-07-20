@@ -54,7 +54,7 @@ async function startServer() {
       try {
         console.log(`Generating report via Gemini for input: ${cleanInput} (${type})`);
         
-        const systemPrompt = `You are a vehicle reporting backend for vinpremium.Uk.
+        const systemPrompt = `You are a vehicle reporting backend for vinpremium.co.uk.
 Generate a highly detailed, extremely plausible vehicle history report in the UK format for input: "${cleanInput}" which is a ${type === 'plate' ? 'UK license plate' : '17-digit VIN'}.
 Your output MUST be a strict JSON object that conforms to the following TypeScript interface:
 
@@ -332,60 +332,102 @@ Return ONLY valid JSON and do not wrap in markdown blocks.`;
 
   // POST /api/gumroad-webhook
   app.post("/api/gumroad-webhook", (req, res) => {
-    console.log("Received Gumroad webhook payload:", req.body);
+    console.log("Received Gumroad webhook payload:", JSON.stringify(req.body, null, 2));
 
     const body = req.body || {};
     
-    // Extract fields with flexible fallbacks
-    const email = (body.email || body.buyer_email || body.customer_email || "").trim().toLowerCase();
+    // Extract standard Gumroad variables with high resilience
     const product_id = (body.product_id || body.permalink || "gold-check");
     const product_name = (body.product_name || "Gold Ultimate Check");
     const order_id = String(body.order_number || body.sale_id || body.id || "ord_" + Math.random().toString(36).substring(2, 9));
-    const license_key = (body.license_key || "").trim();
+    const license_key = String(body.license_key || "").trim();
     
-    // Extract registration number from root or custom_fields
+    // 1. Smart Recursive Scanners for extreme payload flexibility (JSON, flat, urlencoded form fields)
+    let email = (body.email || body.buyer_email || body.customer_email || "").trim().toLowerCase();
     let registration_number = "";
-    if (body.registration_number) {
-      registration_number = body.registration_number;
-    } else if (body.registration) {
-      registration_number = body.registration;
-    } else if (body.plate) {
-      registration_number = body.plate;
-    } else if (body.custom_fields) {
+
+    // Scan for registration number / plate in any key containing plate, registration, vin, or reg
+    const searchKeys = ["registration", "plate", "vin", "reg"];
+    const scanForRegistration = (obj: any) => {
+      if (!obj || typeof obj !== "object") return;
+      const keys = Object.keys(obj);
+      for (const key of keys) {
+        const lowerKey = key.toLowerCase();
+        if (searchKeys.some(sk => lowerKey.includes(sk))) {
+          const val = obj[key];
+          if (typeof val === "string" && val.trim().length >= 2 && val.trim().length <= 30) {
+            registration_number = val.trim().toUpperCase();
+            return;
+          }
+        }
+      }
+      for (const key of keys) {
+        if (typeof obj[key] === "object" && obj[key] !== null) {
+          scanForRegistration(obj[key]);
+          if (registration_number) return;
+        }
+      }
+    };
+
+    // Scan for email in any key containing email
+    const scanForEmail = (obj: any) => {
+      if (!obj || typeof obj !== "object") return;
+      const keys = Object.keys(obj);
+      for (const key of keys) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey.includes("email")) {
+          const val = obj[key];
+          if (typeof val === "string" && val.includes("@")) {
+            email = val.trim().toLowerCase();
+            return;
+          }
+        }
+      }
+      for (const key of keys) {
+        if (typeof obj[key] === "object" && obj[key] !== null) {
+          scanForEmail(obj[key]);
+          if (email) return;
+        }
+      }
+    };
+
+    // Run custom scans
+    scanForRegistration(body);
+    if (!email) {
+      scanForEmail(body);
+    }
+
+    // Try parsing stringified custom_fields if available
+    if (body.custom_fields) {
       let customFieldsObj = body.custom_fields;
       if (typeof customFieldsObj === "string") {
         try {
           customFieldsObj = JSON.parse(customFieldsObj);
         } catch (e) {
-          // ignore parsing error
+          // Ignore
         }
       }
       if (typeof customFieldsObj === "object" && customFieldsObj !== null) {
-        registration_number = 
-          customFieldsObj.registration_number || 
-          customFieldsObj.registration || 
-          customFieldsObj.plate || 
-          customFieldsObj["Registration Number"] || 
-          customFieldsObj["registration_number"] || 
-          "";
+        scanForRegistration(customFieldsObj);
+        if (!email) scanForEmail(customFieldsObj);
       }
     }
 
-    // Fallback to query params if any
+    // Fallbacks to query params if webhook URL is configured with custom queries
     if (!registration_number && req.query.registration) {
-      registration_number = String(req.query.registration);
+      registration_number = String(req.query.registration).toUpperCase();
     }
     if (!registration_number && req.query.registration_number) {
-      registration_number = String(req.query.registration_number);
+      registration_number = String(req.query.registration_number).toUpperCase();
+    }
+    if (!email && req.query.email) {
+      email = String(req.query.email).trim().toLowerCase();
     }
 
-    registration_number = registration_number.trim().toUpperCase();
+    const cleanRegistration = registration_number.trim().toUpperCase();
 
-    const payment_status = (body.payment_status || "paid").trim().toLowerCase();
-    const purchase_date = body.created_at || new Date().toISOString();
-
-    if (!email || !registration_number) {
-      console.warn("Webhook Warning: Missing critical details. email:", email, "registration_number:", registration_number);
+    if (!email || !cleanRegistration) {
+      console.warn("Webhook Warning: Missing critical details. Detected Email:", email, "Plate/VIN:", cleanRegistration);
     }
 
     const payments = readPayments();
@@ -394,13 +436,13 @@ Return ONLY valid JSON and do not wrap in markdown blocks.`;
     const existingIndex = payments.findIndex(p => p.order_id === order_id);
     
     const paymentRecord: PaymentInfo = {
-      email,
+      email: email || "unknown@vinpremium.co.uk",
       product_id,
       product_name,
       order_id,
-      registration_number,
+      registration_number: cleanRegistration || "UNKNOWN",
       payment_status: "paid", // webhook ping indicates payment success
-      purchase_date,
+      purchase_date: body.created_at || new Date().toISOString(),
       license_key: license_key || undefined
     };
 
@@ -411,9 +453,13 @@ Return ONLY valid JSON and do not wrap in markdown blocks.`;
     }
 
     writePayments(payments);
-    console.log(`Stored payment: Email=${email}, Plate=${registration_number}, OrderID=${order_id}, LicenseKey=${license_key}`);
+    console.log(`[Webhook Success] Stored payment: Email=${email}, Plate=${cleanRegistration}, OrderID=${order_id}, LicenseKey=${license_key}`);
 
-    return res.json({ success: true, message: "Webhook processed and stored." });
+    return res.json({ 
+      success: true, 
+      message: "Webhook processed and stored.", 
+      detected: { email, registration: cleanRegistration, order_id, license_key } 
+    });
   });
 
   // GET /api/gumroad-webhook (Convenience GET endpoint for easy testing / simulation)

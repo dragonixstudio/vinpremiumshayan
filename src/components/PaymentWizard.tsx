@@ -12,17 +12,23 @@ import {
   Gem,
   Award,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  Mail
 } from "lucide-react";
 import { PricingPlan } from "../types";
+import { supabase } from "../lib/supabase";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface PaymentWizardProps {
   vinOrPlate: string;
   onPaymentSuccess: (planId: string) => void;
   onClose: () => void;
+  user: SupabaseUser | null;
+  onAuthSuccess: (user: SupabaseUser) => void;
 }
 
-export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }: PaymentWizardProps) {
+export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose, user, onAuthSuccess }: PaymentWizardProps) {
   // Steps: "data-pull" | "gateway-setup" | "select-plan" | "checkout" | "processing" | "success"
   const [step, setStep] = useState<"data-pull" | "gateway-setup" | "select-plan" | "checkout" | "success">("data-pull");
   const [progress, setProgress] = useState(0);
@@ -30,8 +36,19 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
   
   // Email and redirection state
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [plate, setPlate] = useState(vinOrPlate);
+  const [vin, setVin] = useState("");
   const [formErrors, setFormErrors] = useState<string>("");
   const [isPaying, setIsPaying] = useState(false);
+
+  // Auth states for non-signed-up users
+  const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [password, setPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
 
   const plans: PricingPlan[] = [
     {
@@ -87,6 +104,16 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     setSelectedPlan(plans[1]);
   }, []);
 
+  // Prefill name and email if user is logged in
+  useEffect(() => {
+    if (user) {
+      const fName = user.user_metadata?.first_name || "";
+      const lName = user.user_metadata?.last_name || "";
+      setName(`${fName} ${lName}`.trim() || user.email?.split("@")[0] || "");
+      setEmail(user.email || "");
+    }
+  }, [user]);
+
   // Step 1: Data pulling loading simulator (fantasy colors)
   useEffect(() => {
     if (step === "data-pull") {
@@ -127,54 +154,231 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
     }
   }, [step]);
 
-  const getGumroadUrl = () => {
+  const getGumroadUrl = (finalEmail: string, finalName: string) => {
     let baseUrl = "https://gumroad.com/l/vinpremium-gold";
     if (selectedPlan?.id === "diamond") {
       baseUrl = (import.meta as any).env.VITE_GUMROAD_DIAMOND_URL || "https://gumroad.com/l/vinpremium-diamond";
     } else if (selectedPlan?.id === "gold") {
       baseUrl = (import.meta as any).env.VITE_GUMROAD_GOLD_URL || "https://gumroad.com/l/vinpremium-gold";
     } else if (selectedPlan?.id === "silver") {
-      baseUrl = "https://gumroad.com/l/vinpremium-silver";
+      baseUrl = "https://vippremiumuk.gumroad.com/l/nqzkwy?_gl=1*17q1trw*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ1MjY1NDkkbzIkZzEkdDE3ODQ1MjcwNDMkajYwJGwwJGgw";
     }
 
     const currentHost = window.location.origin;
-    const redirectUrl = `${currentHost}/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+    const redirectUrl = `${currentHost}/success?email=${encodeURIComponent(finalEmail)}&name=${encodeURIComponent(finalName)}&registration=${encodeURIComponent(plate)}&vin=${encodeURIComponent(vin)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
     
-    return `${baseUrl}?email=${encodeURIComponent(email)}&registration_number=${encodeURIComponent(vinOrPlate)}&registration=${encodeURIComponent(vinOrPlate)}&redirect=${encodeURIComponent(redirectUrl)}`;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}email=${encodeURIComponent(finalEmail)}&registration_number=${encodeURIComponent(plate)}&registration=${encodeURIComponent(plate)}&redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
-  const handlePayRedirect = (e: React.FormEvent) => {
+  const handlePayRedirect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setFormErrors("Please enter a valid email address.");
+    
+    const finalName = user ? name : `${firstName} ${lastName}`.trim();
+    const finalEmail = user ? email : email;
+
+    if (!user) {
+      if (authMode === "signup") {
+        if (!firstName.trim() || !lastName.trim()) {
+          setFormErrors("Please enter your first and last name.");
+          return;
+        }
+      }
+      if (!email.trim()) {
+        setFormErrors("Please enter a valid email address.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setFormErrors("Please enter a password of at least 6 characters.");
+        return;
+      }
+    } else {
+      if (!name.trim()) {
+        setFormErrors("Please enter your full name.");
+        return;
+      }
+      if (!email.trim()) {
+        setFormErrors("Please enter a valid email address.");
+        return;
+      }
+    }
+
+    if (!plate.trim()) {
+      setFormErrors("Please enter the vehicle registration number plate.");
       return;
     }
+
     setFormErrors("");
     setIsPaying(true);
+
+    try {
+      // Handle Supabase Auth if not logged in
+      if (!user) {
+        if (authMode === "signup") {
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { first_name: firstName, last_name: lastName } }
+          });
+          if (signUpError) {
+            setFormErrors(`Signup failed: ${signUpError.message}`);
+            setIsPaying(false);
+            return;
+          }
+          if (data.user) {
+            onAuthSuccess(data.user);
+          }
+        } else {
+          const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (loginError) {
+            setFormErrors(`Login failed: ${loginError.message}`);
+            setIsPaying(false);
+            return;
+          }
+          if (data.user) {
+            onAuthSuccess(data.user);
+          }
+        }
+      }
+
+      // 1. Submit instantly to Web3Forms using FormData
+      const formData = new FormData();
+      formData.append("access_key", "ef8188b1-f6d1-4c68-866a-f3bde4eef1a8");
+      formData.append("name", finalName);
+      formData.append("email", finalEmail);
+      formData.append("message", `
+NEW SECURE ORDER PLACED ON VINPREMIUM.CO.UK:
+
+Customer Name: ${finalName}
+Customer Email: ${finalEmail}
+Vehicle Registration Plate: ${plate.toUpperCase().trim()}
+Chassis VIN Number: ${vin.toUpperCase().trim() || "Not provided by user"}
+
+Selected Plan: ${selectedPlan?.name || "Gold Ultimate Check"}
+Plan Price: £${selectedPlan?.price || "24.99"} GBP
+
+Payment Status: Redirected to Gumroad Checkout Gateway.
+Delivery Requirement: Manual verification and PDF generation required. Report should be sent via email to ${finalEmail} within 8-10 hours.
+      `.trim());
+
+      await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        body: formData,
+      });
+    } catch (err) {
+      console.error("Web3Forms backup dispatch failed:", err);
+    }
     
     // Open Gumroad checkout in a brand new tab/window
-    const checkoutUrl = getGumroadUrl();
+    const checkoutUrl = getGumroadUrl(finalEmail, finalName);
     window.open(checkoutUrl, "_blank");
     
     // Immediately redirect the current page to our premium success verification loader
-    const successUrl = `/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+    const successUrl = `/success?email=${encodeURIComponent(finalEmail)}&name=${encodeURIComponent(finalName)}&registration=${encodeURIComponent(plate)}&vin=${encodeURIComponent(vin)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
     window.location.href = successUrl;
   };
 
   const handleSimulatePayment = async () => {
-    if (!email) {
-      setFormErrors("Please enter an email address to run the simulation.");
+    const finalName = user ? name : `${firstName} ${lastName}`.trim();
+    const finalEmail = user ? email : email;
+
+    if (!user) {
+      if (authMode === "signup") {
+        if (!firstName.trim() || !lastName.trim()) {
+          setFormErrors("Please enter your first and last name to run the simulation.");
+          return;
+        }
+      }
+      if (!email.trim()) {
+        setFormErrors("Please enter an email address to run the simulation.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setFormErrors("Please enter a password of at least 6 characters.");
+        return;
+      }
+    } else {
+      if (!name.trim()) {
+        setFormErrors("Please enter your full name to run the simulation.");
+        return;
+      }
+      if (!email.trim()) {
+        setFormErrors("Please enter an email address to run the simulation.");
+        return;
+      }
+    }
+    
+    if (!plate.trim()) {
+      setFormErrors("Please enter the registration plate to run the simulation.");
       return;
     }
     
     setIsPaying(true);
     setFormErrors("");
     try {
-      const response = await fetch(`/api/gumroad-webhook?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&product_id=${encodeURIComponent(selectedPlan?.id || "gold")}&product_name=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}`);
+      // Handle Supabase Auth if not logged in
+      if (!user) {
+        if (authMode === "signup") {
+          const { data, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { first_name: firstName, last_name: lastName } }
+          });
+          if (signUpError) {
+            setFormErrors(`Signup failed: ${signUpError.message}`);
+            setIsPaying(false);
+            return;
+          }
+          if (data.user) {
+            onAuthSuccess(data.user);
+          }
+        } else {
+          const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (loginError) {
+            setFormErrors(`Login failed: ${loginError.message}`);
+            setIsPaying(false);
+            return;
+          }
+          if (data.user) {
+            onAuthSuccess(data.user);
+          }
+        }
+      }
+
+      // Send simulation to Web3Forms as well
+      try {
+        const formData = new FormData();
+        formData.append("access_key", "ef8188b1-f6d1-4c68-866a-f3bde4eef1a8");
+        formData.append("name", `${finalName} (SIMULATED)`);
+        formData.append("email", finalEmail);
+        formData.append("message", `
+[SIMULATED TEST ORDER ON VINPREMIUM.CO.UK]
+
+Customer Name: ${finalName}
+Customer Email: ${finalEmail}
+Vehicle Registration Plate: ${plate.toUpperCase().trim()}
+Chassis VIN Number: ${vin.toUpperCase().trim() || "Not provided by user"}
+
+Selected Plan: ${selectedPlan?.name || "Gold Ultimate Check"}
+Plan Price: £${selectedPlan?.price || "24.99"} GBP
+
+Payment Status: SIMULATED PAYMENT APPROVED
+Delivery Requirement: Manual verification and PDF generation required. Report should be sent via email to ${finalEmail} within 8-10 hours.
+        `.trim());
+
+        await fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          body: formData,
+        });
+      } catch (e) {
+        console.error("Simulated Web3Forms email submission failure:", e);
+      }
+
+      const response = await fetch(`/api/gumroad-webhook?email=${encodeURIComponent(finalEmail)}&registration=${encodeURIComponent(plate)}&product_id=${encodeURIComponent(selectedPlan?.id || "gold")}&product_name=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}`);
       
       if (response.ok) {
         // Redirect to success page so it polls, verifies, and unlocks!
-        window.location.href = `/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(vinOrPlate)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
+        window.location.href = `/success?email=${encodeURIComponent(finalEmail)}&name=${encodeURIComponent(finalName)}&registration=${encodeURIComponent(plate)}&vin=${encodeURIComponent(vin)}&plan=${encodeURIComponent(selectedPlan?.id || "gold")}&planName=${encodeURIComponent(selectedPlan?.name || "Gold Ultimate Check")}&price=${encodeURIComponent(selectedPlan?.price || "24.99")}`;
       } else {
         setFormErrors("Simulation failed. Could not communicate with webhook endpoint.");
       }
@@ -446,13 +650,15 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                   </button>
 
                   <h3 className="font-display font-bold text-xl text-gray-900 mb-1">
-                    Complete Checkout via Gumroad
+                    {user ? "Complete Your Secured Registration" : "Account Setup & Secured Registration"}
                   </h3>
                   <p className="font-sans text-xs text-gray-500 mb-6">
-                    Enter your email to secure your vehicle history report and official PDF certificate before proceeding.
+                    {user 
+                      ? "Your account is secure. Enter vehicle details to manually certify your history report and PDF."
+                      : "Please sign up or log in below. We will create your secure account and compile your vehicle history."}
                   </p>
 
-                  <form onSubmit={handlePayRedirect} className="space-y-5">
+                  <form onSubmit={handlePayRedirect} className="space-y-4">
                     
                     {formErrors && (
                       <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded-r-lg text-xs font-sans text-red-800 font-medium">
@@ -460,23 +666,237 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                       </div>
                     )}
 
-                    {/* Email Input */}
-                    <div>
-                      <label className="block text-xs font-sans font-semibold text-gray-700 mb-1.5">
-                        Your Email Address
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600"
-                        required
-                      />
-                      <p className="text-[10px] text-gray-400 mt-1.5">
-                        Your official printable PDF certificate and invoice will be registered and delivered to this address.
-                      </p>
+                    {!user ? (
+                      <div className="bg-gray-50 border border-gray-150 rounded-xl p-4.5 mb-2 space-y-4">
+                        <div className="flex border-b border-gray-200 pb-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthMode("signup");
+                              setFormErrors("");
+                            }}
+                            className={`flex-1 text-center font-sans font-bold text-xs py-1 px-3 rounded-lg transition-all cursor-pointer ${
+                              authMode === "signup"
+                                ? "bg-red-600 text-white shadow-xs"
+                                : "text-gray-500 hover:text-gray-800"
+                            }`}
+                          >
+                            Create Account (Sign Up)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthMode("login");
+                              setFormErrors("");
+                            }}
+                            className={`flex-1 text-center font-sans font-bold text-xs py-1 px-3 rounded-lg transition-all cursor-pointer ${
+                              authMode === "login"
+                                ? "bg-red-600 text-white shadow-xs"
+                                : "text-gray-500 hover:text-gray-800"
+                            }`}
+                          >
+                            Already Registered? (Log In)
+                          </button>
+                        </div>
+
+                        {authMode === "signup" ? (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                  First Name
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                    <User className="w-3.5 h-3.5" />
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="John"
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                  Last Name
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                    <User className="w-3.5 h-3.5" />
+                                  </span>
+                                  <input
+                                    type="text"
+                                    placeholder="Doe"
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                    required
+                                  />
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                  Email Address
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                    <Mail className="w-3.5 h-3.5" />
+                                  </span>
+                                  <input
+                                    type="email"
+                                    placeholder="you@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                  Password
+                                </label>
+                                <div className="relative">
+                                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </span>
+                                  <input
+                                    type="password"
+                                    placeholder="Min. 6 characters"
+                                    value={password}
+                                    minLength={6}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                    required
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                Email Address
+                              </label>
+                              <div className="relative">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                  <Mail className="w-3.5 h-3.5" />
+                                </span>
+                                <input
+                                  type="email"
+                                  placeholder="you@example.com"
+                                  value={email}
+                                  onChange={(e) => setEmail(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-1">
+                                Password
+                              </label>
+                              <div className="relative">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 pointer-events-none">
+                                  <Lock className="w-3.5 h-3.5" />
+                                </span>
+                                <input
+                                  type="password"
+                                  placeholder="Enter your password"
+                                  value={password}
+                                  onChange={(e) => setPassword(e.target.value)}
+                                  className="w-full border border-gray-200 rounded-lg pl-8 pr-3 py-2 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                                  required
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-red-50/10 border border-red-100/40 p-4 rounded-xl mb-2">
+                        {/* Name Input */}
+                        <div>
+                          <label className="block text-xs font-sans font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. John Doe"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                            required
+                          />
+                        </div>
+
+                        {/* Email Input */}
+                        <div>
+                          <label className="block text-xs font-sans font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs font-sans focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white/70"
+                            required
+                            disabled
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Plate Input */}
+                      <div>
+                        <label className="block text-xs font-sans font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                          UK Number Plate
+                        </label>
+                        <div className="flex border border-gray-950 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-red-100 focus-within:border-red-600">
+                          <div className="bg-blue-800 text-white px-2.5 flex flex-col justify-center items-center font-sans font-bold text-[8px] tracking-tight shrink-0 select-none">
+                            <span>GB</span>
+                            <span className="text-yellow-400">★</span>
+                          </div>
+                          <input
+                            type="text"
+                            placeholder="e.g. WP69 XYA"
+                            value={plate}
+                            onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                            className="w-full px-3 py-2 text-xs font-mono font-extrabold tracking-widest uppercase bg-yellow-100 text-gray-900 focus:outline-none"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* VIN Input */}
+                      <div>
+                        <label className="block text-xs font-sans font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                          17-Digit VIN / Chassis (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="SADFC8DF9HA021..."
+                          value={vin}
+                          maxLength={17}
+                          onChange={(e) => setVin(e.target.value.toUpperCase())}
+                          className="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-600 bg-white"
+                        />
+                      </div>
                     </div>
+
+                    <p className="text-[10px] text-gray-400 leading-normal bg-gray-50 p-3 rounded-lg border border-gray-150">
+                      ℹ️ <strong>Manual Dispatch Commitment:</strong> Because we verify real, live registries, your complete certified vehicle history report will be compiled manually and delivered as a premium PDF certificate directly to your email address within <strong>8 to 10 hours</strong>.
+                    </p>
 
                     <div className="pt-2 space-y-3">
                       <button
@@ -487,20 +907,16 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                         {isPaying ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            <span>Redirecting to Gumroad Gateway...</span>
+                            <span>{user ? "Dispatching details & launching gateway..." : authMode === "signup" ? "Signing up & dispatching..." : "Logging in & dispatching..."}</span>
                           </>
                         ) : (
                           <>
                             <Lock className="w-4 h-4" />
-                            <span>Unlock via Secure Gumroad Checkout (£{selectedPlan.price} GBP)</span>
+                            <span>{user ? `Pay & Unlock Manual Report (£${selectedPlan.price} GBP)` : authMode === "signup" ? `Register & Unlock Report (£${selectedPlan.price} GBP)` : `Log In & Unlock Report (£${selectedPlan.price} GBP)`}</span>
                           </>
                         )}
                       </button>
-
-
-
                     </div>
-
                   </form>
                 </div>
 
@@ -514,7 +930,7 @@ export default function PaymentWizard({ vinOrPlate, onPaymentSuccess, onClose }:
                       {selectedPlan.name}
                     </h4>
                     <p className="font-sans text-xs text-gray-400 mb-4">
-                      Single purchase for {vinOrPlate}
+                      Single purchase for {plate}
                     </p>
 
                     <div className="space-y-3 py-4 border-y border-gray-200/60 text-xs">

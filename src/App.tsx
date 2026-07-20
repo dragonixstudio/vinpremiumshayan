@@ -32,6 +32,10 @@ import ReportViewer from "./components/ReportViewer";
 import SuccessView from "./components/SuccessView";
 import CancelView from "./components/CancelView";
 import ContactView from "./components/ContactView";
+import AuthView from "./components/AuthView";
+import DashboardView from "./components/DashboardView";
+import { supabase } from "./lib/supabase";
+import { User } from "@supabase/supabase-js";
 import { VehicleReport } from "./types";
 import { generateSimulatedReport } from "./lib/mockDatabase";
 
@@ -39,7 +43,7 @@ import { generateSimulatedReport } from "./lib/mockDatabase";
 const carBanner = "/car_banner_1784095133179.jpg";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "success" | "cancel" | "contact">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "success" | "cancel" | "contact" | "dashboard" | "auth">("home");
   const [vinOrPlate, setVinOrPlate] = useState("");
   const [searchType, setSearchType] = useState<"vin" | "plate">("plate");
   
@@ -56,6 +60,150 @@ export default function App() {
 
   // FAQ state
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+
+  // Supabase User Session State
+  const [user, setUser] = useState<User | null>(null);
+
+  // Vehicle Audits List State (History)
+  const [audits, setAudits] = useState<any[]>([]);
+  const [auditsLoading, setAuditsLoading] = useState(false);
+  const [auditsError, setAuditsError] = useState("");
+
+  const fetchUserAudits = async (userId: string) => {
+    setAuditsLoading(true);
+    setAuditsError("");
+    try {
+      const { data, error } = await supabase
+        .from("vehicle_audits")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setAudits(data || []);
+    } catch (err) {
+      console.error("Error fetching vehicle audits:", err);
+      setAuditsError("Couldn't load your reports, please refresh the page");
+    } finally {
+      setAuditsLoading(false);
+    }
+  };
+
+  const markAuditAsPaid = async (userId: string, plate: string) => {
+    try {
+      const { error } = await supabase
+        .from("vehicle_audits")
+        .update({ status: "paid", amount_paid: 24.99 })
+        .eq("user_id", userId)
+        .eq("number_plate", plate.toUpperCase().trim());
+
+      if (error) {
+        console.error("Error marking audit as paid in Supabase:", error);
+      } else {
+        console.log(`Updated audit status to paid for ${plate}`);
+        await fetchUserAudits(userId);
+      }
+    } catch (err) {
+      console.error("Failed to update audit status:", err);
+    }
+  };
+
+  const ensurePendingAudit = async (currentUser: User | null, reportData: VehicleReport | null) => {
+    if (!currentUser || !reportData) return;
+    try {
+      const plate = reportData.plate || "";
+      if (!plate) return;
+
+      const { data: existing, error: checkError } = await supabase
+        .from("vehicle_audits")
+        .select("id, status")
+        .eq("user_id", currentUser.id)
+        .eq("number_plate", plate.toUpperCase().trim())
+        .maybeSingle();
+
+      if (checkError) {
+        console.error("Error checking existing audit:", checkError);
+      }
+
+      if (existing) {
+        console.log(`Audit for ${plate} already exists with status: ${existing.status}`);
+        return;
+      }
+
+      const motStatus = reportData.motHistory?.[0]?.result || "Pass";
+      const taxStatus = reportData.roadTaxStatus || "Taxed";
+      const colour = reportData.color || "Unknown";
+      const fuelType = reportData.fuelType || "Unknown";
+
+      const { error: insertError } = await supabase
+        .from("vehicle_audits")
+        .insert({
+          user_id: currentUser.id,
+          number_plate: plate.toUpperCase().trim(),
+          make: reportData.make || "Unknown",
+          model: reportData.model || "Unknown",
+          colour: colour,
+          fuel_type: fuelType,
+          mot_status: motStatus,
+          tax_status: taxStatus,
+          full_report: reportData,
+          amount_paid: 0,
+          status: "pending",
+          created_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error("Error inserting pending audit:", insertError);
+      } else {
+        console.log(`Successfully created pending audit row for ${plate}`);
+        await fetchUserAudits(currentUser.id);
+      }
+    } catch (err) {
+      console.error("Error in ensurePendingAudit:", err);
+    }
+  };
+
+  // Listen to Supabase Authentication State Changes
+  useEffect(() => {
+    // Fetch current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const activeUser = session?.user ?? null;
+      setUser(activeUser);
+      if (activeUser) {
+        fetchUserAudits(activeUser.id);
+      }
+    });
+
+    // Listen to real-time auth event streams
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const activeUser = session?.user ?? null;
+      setUser(activeUser);
+      if (activeUser) {
+        fetchUserAudits(activeUser.id);
+      } else {
+        setAudits([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch audits when navigating to dashboard
+  useEffect(() => {
+    if (activeTab === "dashboard" && user) {
+      fetchUserAudits(user.id);
+    }
+  }, [activeTab, user]);
+
+  // Safeguards for Auth and Dashboard tabs
+  useEffect(() => {
+    if (activeTab === "dashboard" && !user) {
+      setActiveTab("auth");
+    }
+    if (activeTab === "auth" && user) {
+      setActiveTab("dashboard");
+    }
+  }, [activeTab, user]);
 
   // Scroll to pricing section if tab changes to "pricing"
   useEffect(() => {
@@ -97,11 +245,22 @@ export default function App() {
       if (response.ok) {
         const data = await response.json();
         setReport(data);
+        if (user) {
+          await markAuditAsPaid(user.id, registration);
+        }
       } else {
-        setReport(generateSimulatedReport(registration, "plate"));
+        const fallbackReport = generateSimulatedReport(registration, "plate");
+        setReport(fallbackReport);
+        if (user) {
+          await markAuditAsPaid(user.id, registration);
+        }
       }
     } catch (e) {
-      setReport(generateSimulatedReport(registration, "plate"));
+      const fallbackReport = generateSimulatedReport(registration, "plate");
+      setReport(fallbackReport);
+      if (user) {
+        await markAuditAsPaid(user.id, registration);
+      }
     }
     
     setIsUnlocked(true);
@@ -178,12 +337,15 @@ export default function App() {
       }
       
       // Complete remaining loading ticks
-      setTimeout(() => {
+      setTimeout(async () => {
         clearInterval(interval);
         setReport(data);
         setIsUnlocked(false); // Locked preview default
         setLoading(false);
         setActiveTab("report");
+        if (user) {
+          await ensurePendingAudit(user, data);
+        }
       }, 4500);
 
     } catch (err: any) {
@@ -206,8 +368,8 @@ export default function App() {
 
   const faqs = [
     {
-      q: "What is a VinPremium.uk Vehicle Check?",
-      a: "VinPremium.uk compiles a full multi-point audit report on any UK registered car, van, or motorcycle. Our reports query multiple national databases (DVLA, MOT, MIAFTR write-offs, police stolen registries, outstanding finance records) to give you an unblurred overview of the vehicle's past."
+      q: "What is a VinPremium.co.uk Vehicle Check?",
+      a: "VinPremium.co.uk compiles a full multi-point audit report on any UK registered car, van, or motorcycle. Our reports query multiple national databases (DVLA, MOT, MIAFTR write-offs, police stolen registries, outstanding finance records) to give you an unblurred overview of the vehicle's past."
     },
     {
       q: "How does the £40,000 Data Accuracy Guarantee work?",
@@ -240,6 +402,7 @@ export default function App() {
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         hasActiveReport={!!report} 
+        user={user}
       />
 
       {/* Main Switchboard Content */}
@@ -287,6 +450,44 @@ export default function App() {
               report={report} 
               isUnlocked={isUnlocked} 
               onUnlockClick={() => setShowCheckout(true)} 
+            />
+          </div>
+        )}
+
+        {/* VIEW: SECURE AUTHENTICATION */}
+        {activeTab === "auth" && (
+          <div className="py-12 bg-gray-50 flex items-center justify-center min-h-[60vh]">
+            <AuthView 
+              onSuccess={() => {
+                setActiveTab("dashboard");
+              }} 
+            />
+          </div>
+        )}
+
+        {/* VIEW: SECURE USER PORTAL DASHBOARD */}
+        {activeTab === "dashboard" && user && (
+          <div className="bg-gray-50 min-h-[70vh] py-8">
+            <DashboardView 
+              user={user} 
+              onLogout={() => {
+                setUser(null);
+                setActiveTab("home");
+              }} 
+              activeReport={report}
+              onViewReport={() => setActiveTab("report")}
+              audits={audits}
+              auditsLoading={auditsLoading}
+              auditsError={auditsError}
+              onSelectPendingAudit={(plate, reportData) => {
+                setReport(reportData);
+                setShowCheckout(true);
+              }}
+              onSelectPaidAudit={(reportData) => {
+                setReport(reportData);
+                setIsUnlocked(true);
+                setActiveTab("report");
+              }}
             />
           </div>
         )}
@@ -451,9 +652,9 @@ export default function App() {
                            {/* Quick Demos */}
                            <div className="pt-4 border-t border-gray-100">
                              <span className="block text-[10px] font-sans font-bold uppercase tracking-wider text-gray-400 mb-2">
-                               Test Live Simulated Queries (6 Vehicle Scenarios):
+                               Test Live Simulated Queries (2 Vehicle Scenarios):
                              </span>
-                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                             <div className="grid grid-cols-2 gap-1.5">
                                <button
                                  type="button"
                                  onClick={() => handleDemoClick("WP69 XYA")}
@@ -469,38 +670,6 @@ export default function App() {
                                  title="LS21 TES (Tesla Model 3 - Clean)"
                                >
                                  🟢 LS21 TES (Tesla)
-                               </button>
-                               <button
-                                 type="button"
-                                 onClick={() => handleDemoClick("LV70 ABC")}
-                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
-                                 title="LV70 ABC (Audi A4 - Outstanding Finance)"
-                               >
-                                 🟡 LV70 ABC (Audi Finance)
-                               </button>
-                               <button
-                                 type="button"
-                                 onClick={() => handleDemoClick("GJ18 XYZ")}
-                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
-                                 title="GJ18 XYZ (Ford Fiesta - Cat N Write-off)"
-                               >
-                                 🟠 GJ18 XYZ (Fiesta Cat N)
-                               </button>
-                               <button
-                                 type="button"
-                                 onClick={() => handleDemoClick("HG21 HBY")}
-                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
-                                 title="HG21 HBY (Toyota Yaris - Pristine Hybrid)"
-                               >
-                                 🟢 HG21 HBY (Yaris Hybrid)
-                               </button>
-                               <button
-                                 type="button"
-                                 onClick={() => handleDemoClick("RO67 VLR")}
-                                 className="bg-gray-100 hover:bg-red-50 hover:text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold text-gray-600 cursor-pointer transition-colors text-left truncate"
-                                 title="RO67 VLR (Range Rover - Structural S & Finance)"
-                               >
-                                 🔴 RO67 VLR (Velar Cat S)
                                </button>
                              </div>
                            </div>
@@ -891,7 +1060,7 @@ export default function App() {
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <span className="font-display font-bold text-lg tracking-tight text-white">
-                  vinpremium<span className="text-red-600">.uk</span>
+                  vinpremium<span className="text-red-600">.co.uk</span>
                 </span>
               </div>
               <p className="text-xs text-gray-400 leading-relaxed">
@@ -955,7 +1124,7 @@ export default function App() {
                 </li>
                 <li className="flex items-center space-x-2">
                   <Mail className="w-4 h-4 text-red-600 shrink-0" />
-                  <span><strong>DPO Support:</strong> compliance@vinpremium.uk</span>
+                  <span><strong>DPO Support:</strong> compliance@vinpremium.co.uk</span>
                 </li>
               </ul>
             </div>
@@ -965,7 +1134,7 @@ export default function App() {
           {/* Legal Bar */}
           <div className="border-t border-gray-800 pt-8 flex flex-col sm:flex-row justify-between items-center text-center sm:text-left space-y-4 sm:space-y-0 text-gray-500 text-[11px]">
             <p>
-              © 2026 VinPremium UK Ltd. All rights reserved. vinpremium.uk is not affiliated with nor endorsed by the DVLA. All search lookup parameters are subject to our standard accuracy guarantee.
+              © 2026 VinPremium UK Ltd. All rights reserved. vinpremium.co.uk is not affiliated with nor endorsed by the DVLA. All search lookup parameters are subject to our standard accuracy guarantee.
             </p>
             <div className="flex space-x-4">
               <button onClick={() => setActiveTab("privacy")} className="hover:text-white cursor-pointer">
@@ -987,6 +1156,13 @@ export default function App() {
           vinOrPlate={report.plate}
           onPaymentSuccess={handlePaymentComplete}
           onClose={() => setShowCheckout(false)}
+          user={user}
+          onAuthSuccess={async (loggedInUser) => {
+            setUser(loggedInUser);
+            if (report) {
+              await ensurePendingAudit(loggedInUser, report);
+            }
+          }}
         />
       )}
 

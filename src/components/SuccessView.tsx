@@ -10,7 +10,9 @@ export default function SuccessView({ onUnlockReport, onNavigateHome }: SuccessV
   const [loading, setLoading] = useState(true);
   const [paid, setPaid] = useState(false);
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
   const [registration, setRegistration] = useState("");
+  const [vin, setVin] = useState("");
   const [plan, setPlan] = useState("");
   const [planName, setPlanName] = useState("");
   const [price, setPrice] = useState("");
@@ -30,26 +32,31 @@ export default function SuccessView({ onUnlockReport, onNavigateHome }: SuccessV
     } else if (plan === "gold") {
       baseUrl = (import.meta as any).env?.VITE_GUMROAD_GOLD_URL || "https://gumroad.com/l/vinpremium-gold";
     } else if (plan === "silver") {
-      baseUrl = "https://gumroad.com/l/vinpremium-silver";
+      baseUrl = "https://vippremiumuk.gumroad.com/l/nqzkwy?_gl=1*17q1trw*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ1MjY1NDkkbzIkZzEkdDE3ODQ1MjcwNDMkajYwJGwwJGgw";
     }
 
     const currentHost = window.location.origin;
-    const redirectUrl = `${currentHost}/success?email=${encodeURIComponent(email)}&registration=${encodeURIComponent(registration)}&plan=${encodeURIComponent(plan)}&planName=${encodeURIComponent(planName)}&price=${encodeURIComponent(price)}`;
+    const redirectUrl = `${currentHost}/success?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}&registration=${encodeURIComponent(registration)}&vin=${encodeURIComponent(vin)}&plan=${encodeURIComponent(plan)}&planName=${encodeURIComponent(planName)}&price=${encodeURIComponent(price)}`;
     
-    return `${baseUrl}?email=${encodeURIComponent(email)}&registration_number=${encodeURIComponent(registration)}&registration=${encodeURIComponent(registration)}&redirect=${encodeURIComponent(redirectUrl)}`;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}email=${encodeURIComponent(email)}&registration_number=${encodeURIComponent(registration)}&registration=${encodeURIComponent(registration)}&redirect=${encodeURIComponent(redirectUrl)}`;
   };
 
   useEffect(() => {
     // Parse query parameters
     const params = new URLSearchParams(window.location.search);
     const emailParam = params.get("email") || "";
+    const nameParam = params.get("name") || "";
     const regParam = params.get("registration") || params.get("registration_number") || params.get("plate") || "";
+    const vinParam = params.get("vin") || "";
     const planParam = params.get("plan") || "gold";
     const planNameParam = params.get("planName") || "Gold Ultimate Check";
     const priceParam = params.get("price") || "24.99";
 
     setEmail(emailParam);
+    setName(nameParam);
     setRegistration(regParam.toUpperCase().trim());
+    setVin(vinParam);
     setPlan(planParam);
     setPlanName(planNameParam);
     setPrice(priceParam);
@@ -232,29 +239,67 @@ export default function SuccessView({ onUnlockReport, onNavigateHome }: SuccessV
           </div>
         </div>
       ) : paid ? (
-        <div className="bg-white border border-gray-150 rounded-3xl p-8 md:p-12 shadow-lg shadow-gray-100 max-w-xl mx-auto animate-fadeIn">
-          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100">
+        <div className="bg-white border border-gray-150 rounded-3xl p-8 md:p-12 shadow-lg shadow-gray-100 max-w-xl mx-auto animate-fadeIn text-center">
+          <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-100 shadow-sm">
             <CheckCircle2 className="w-10 h-10" />
           </div>
-          <h2 className="font-display font-bold text-3xl text-gray-900 mb-3">Payment Confirmed!</h2>
-          <p className="font-sans text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-8">
-            Excellent! Your premium vehicle history report for <span className="font-mono text-red-600 font-bold">{registration}</span> has been unlocked successfully.
+          <h2 className="font-display font-bold text-3xl text-gray-900 mb-2">Secure Order Certified!</h2>
+          <p className="font-sans text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-6">
+            Thank you! Your payment of <strong>£{price}</strong> was processed and authorized successfully.
           </p>
 
-          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 text-left space-y-2 mb-8 text-xs max-w-md mx-auto">
-            <p className="font-sans text-gray-400 uppercase tracking-wider font-semibold text-[10px]">Purchase Details</p>
-            <p className="font-sans text-gray-700"><strong>Registered Plate:</strong> {registration}</p>
-            <p className="font-sans text-gray-700"><strong>Customer Email:</strong> {email}</p>
-            <p className="font-sans text-gray-700"><strong>Status:</strong> Unlocked & Ready</p>
+          <div className="bg-amber-50/60 border border-amber-200 rounded-2xl p-4 text-left space-y-2 mb-6 text-xs max-w-md mx-auto">
+            <div className="flex items-center space-x-2 text-amber-800 font-bold uppercase tracking-wider text-[10px]">
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
+              <span>Manual Registry Check Initiated</span>
+            </div>
+            <p className="font-sans text-gray-600 leading-normal">
+              Our registry search agents are manually pulling official DVLA, police records (PNC), write-off histories (MIAFTR), and outstanding finance logs for your vehicle.
+            </p>
+            <p className="font-sans text-amber-900 font-semibold pt-1">
+              ⏳ Estimated delivery to your inbox: <strong>8 to 10 hours</strong>.
+            </p>
           </div>
 
-          <button
-            onClick={() => onUnlockReport(registration)}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-sans font-bold text-sm py-4 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-lg shadow-red-200"
-          >
-            <span>Access Premium Report</span>
-            <FileText className="w-4 h-4" />
-          </button>
+          <div className="bg-gray-50 rounded-2xl p-5 border border-gray-150 text-left space-y-2 mb-8 text-xs max-w-md mx-auto font-sans">
+            <p className="text-gray-400 uppercase tracking-wider font-semibold text-[10px] mb-2">Official Receipt Details</p>
+            <div className="flex justify-between border-b border-gray-200/50 py-1.5">
+              <span className="text-gray-500">Registered Customer</span>
+              <span className="text-gray-900 font-medium">{name || "Registered Customer"}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-200/50 py-1.5">
+              <span className="text-gray-500">UK Number Plate</span>
+              <span className="text-gray-900 font-mono font-bold uppercase bg-yellow-100 px-1.5 py-0.5 rounded border border-gray-200">{registration}</span>
+            </div>
+            {vin && (
+              <div className="flex justify-between border-b border-gray-200/50 py-1.5">
+                <span className="text-gray-500">Chassis VIN Number</span>
+                <span className="text-gray-900 font-mono text-[10px]">{vin}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-b border-gray-200/50 py-1.5">
+              <span className="text-gray-500">Destination Email</span>
+              <span className="text-gray-900 font-medium">{email}</span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-gray-500">Lookup Tier</span>
+              <span className="text-gray-900 font-medium text-red-600">{planName}</span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-[11px] font-sans text-gray-400 max-w-sm mx-auto leading-relaxed">
+              While our experts prepare your formal printable PDF history certificate, you can immediately inspect the instant digital preview dashboard right now.
+            </p>
+
+            <button
+              onClick={() => onUnlockReport(registration)}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-sans font-bold text-sm py-4 rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-2 shadow-lg shadow-red-200"
+            >
+              <span>Access Instant Digital Preview</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-white border border-gray-150 rounded-3xl p-8 md:p-12 shadow-lg shadow-gray-100 max-w-xl mx-auto">

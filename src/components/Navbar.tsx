@@ -1,23 +1,28 @@
 import React from "react";
-import { ShieldCheck, FileText, Menu, X, PhoneCall } from "lucide-react";
+import { ShieldCheck, FileText, Menu, X, PhoneCall, User as UserIcon } from "lucide-react";
+import { User } from "@supabase/supabase-js";
 
 interface NavbarProps {
-  activeTab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact";
-  setActiveTab: (tab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact") => void;
+  activeTab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact" | "dashboard" | "auth" | "success" | "cancel";
+  setActiveTab: (tab: "home" | "about" | "privacy" | "report" | "pricing" | "affiliate" | "contact" | "dashboard" | "auth" | "success" | "cancel") => void;
   hasActiveReport: boolean;
+  user: User | null;
 }
 
-export default function Navbar({ activeTab, setActiveTab, hasActiveReport }: NavbarProps) {
+export default function Navbar({ activeTab, setActiveTab, hasActiveReport, user }: NavbarProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
   const navItems = [
     { id: "home", label: "Home" },
-    { id: "about", label: "About Us" },
     { id: "pricing", label: "Pricing Plans" },
+    { id: "about", label: "About Us" },
     { id: "contact", label: "Contact & Support" },
-    { id: "affiliate", label: "Affiliate Program" },
-    { id: "privacy", label: "Privacy Policy" },
+    { id: "affiliate", label: "Affiliates" },
     ...(hasActiveReport ? [{ id: "report", label: "Active Report" }] : []),
+    ...(user 
+      ? [{ id: "dashboard", label: "My Dashboard" }]
+      : [{ id: "auth", label: "Sign In" }]
+    )
   ];
 
   return (
@@ -35,7 +40,7 @@ export default function Navbar({ activeTab, setActiveTab, hasActiveReport }: Nav
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <span className="font-display font-bold text-xl tracking-tight text-gray-900">
-                vinpremium<span className="text-red-600">.uk</span>
+                vinpremium<span className="text-red-600">.co.uk</span>
               </span>
             </button>
           </div>
