@@ -26,13 +26,13 @@ export default function SuccessView({ onUnlockReport, onNavigateHome }: SuccessV
 
   // Construct Gumroad link for backup reopening
   const getGumroadUrl = () => {
-    let baseUrl = "https://gumroad.com/l/vinpremium-gold";
+    let baseUrl = "https://vippremiumuk.gumroad.com/l/GoldUltimate?_gl=1*16c1a8k*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ4NzE3NTkkbzckZzEkdDE3ODQ8NzMyODAkajYwJGwwJGgw";
     if (plan === "diamond") {
-      baseUrl = (import.meta as any).env?.VITE_GUMROAD_DIAMOND_URL || "https://gumroad.com/l/vinpremium-diamond";
+      baseUrl = (import.meta as any).env?.VITE_GUMROAD_DIAMOND_URL || "https://vippremiumuk.gumroad.com/l/DiamondBundleMulti-VehiclePack?_gl=1*1nf8n8c*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ4NzE3NTkkbzckZzEkdDE3ODQ4NzI1OTYkajkkbDAkaDA";
     } else if (plan === "gold") {
-      baseUrl = (import.meta as any).env?.VITE_GUMROAD_GOLD_URL || "https://gumroad.com/l/vinpremium-gold";
+      baseUrl = (import.meta as any).env?.VITE_GUMROAD_GOLD_URL || "https://vippremiumuk.gumroad.com/l/GoldUltimate?_gl=1*16c1a8k*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ4NzE3NTkkbzckZzEkdDE3ODQ4NzMyODAkajYwJGwwJGgw";
     } else if (plan === "silver") {
-      baseUrl = "https://vippremiumuk.gumroad.com/l/nqzkwy?_gl=1*17q1trw*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ1MjY1NDkkbzIkZzEkdDE3ODQ1MjcwNDMkajYwJGwwJGgw";
+      baseUrl = "https://vippremiumuk.gumroad.com/l/SilverStarter?_gl=1*16c1a8k*_ga*MTUxODMzMzE1NS4xNzg0NDgxOTgz*_ga_6LJN6D94N6*czE3ODQ8NzE3NTkkbzckZzEkdDE3ODQ4NzMyODAkajYwJGwwJGgw";
     }
 
     const currentHost = window.location.origin;
